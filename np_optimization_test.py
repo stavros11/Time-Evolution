@@ -29,7 +29,7 @@ optimizer = utils.AdamComplex(var_state[1:].shape, dtype=var_state.dtype)
 
 overlaps = []
 for epoch in range(n_epochs):
-  Ok, Ok_star_Eloc, Eloc, _ = en.all_states_gradient(np, var_state, ham,
+  Ok, Ok_star_Eloc, Eloc, _ = en.all_states_gradient(var_state, ham,
                                                      dt, Ham2=ham2)
   complex_grad = Ok_star_Eloc - Ok.conj() * Eloc
   var_state[1:] += optimizer.update(complex_grad, epoch)
