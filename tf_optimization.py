@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import calculate_energy_tf as en
 import tensorflow as tf
 import utils
-from models import simple, autoregressive
+from models import simple
 tf.enable_v2_behavior()
 
 
@@ -13,12 +13,12 @@ tf.enable_v2_behavior()
 n_sites = 4
 time_steps = 100
 t_final = 1.0
-h_init = 0.5
-h_ev = 1.0
+h_init = 1.0
+h_ev = 0.5
 
 # Optimization parameters
-ctype = tf.complex64
-n_epochs = 12000
+ctype = tf.complex128
+n_epochs = 10000
 n_message = 500
 optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
 
@@ -38,7 +38,9 @@ ham2 = tf.cast(ham2, dtype=ctype)
 
 
 # Define TF model
-model = simple.SequentialDenseModel(exact_state[0], time_steps)
+model = simple.FullStateModel(exact_state[0], time_steps, std=0.0,
+                              rtype=tf.float64, ctype=tf.complex128)
+#model = simple.SequentialDenseModel(exact_state[0], time_steps)
 #model = autoregressive.FullAutoregressiveModel(exact_state[0], time_steps)
 
 
@@ -46,12 +48,12 @@ model = simple.SequentialDenseModel(exact_state[0], time_steps)
 # only one of the two cases can be used
 
 # Case 1: updater is a function that returns Eloc and auto diff is used.
-updater = lambda psi: tf.real(en.all_states_Eloc(psi, ham, dt, Ham2=ham2))
+#updater = lambda psi: tf.real(en.all_states_Eloc(psi, ham, dt, Ham2=ham2))
 
 # Case 2: updater is a function that returns the complex gradients
-#def updater(full_psi, dt=dt):
-#  Ok, Ok_star_Eloc, Eloc = en.all_states_gradient(full_psi, ham, dt, Ham2=ham2)
-#  return Ok_star_Eloc - tf.conj(Ok) * Eloc 
+def updater(full_psi, dt=dt):
+  Ok, Ok_star_Eloc, Eloc = en.all_states_gradient(full_psi, ham, dt, Ham2=ham2)
+  return Ok_star_Eloc - tf.conj(Ok) * Eloc
 
 
 # Optimize
