@@ -58,6 +58,16 @@ def all_states_Heff(psi_all, Ham, dt, phi_phi=None, Ham2=None):
     
   return tf.concat([n_Heff_0[tf.newaxis], n_Heff, n_Heff_M[tf.newaxis]], 
                    axis=0)
+  
+  
+def all_states_Eloc(full_psi, Ham, dt, Ham2=None):
+  """Calculates expectation value of the local energy."""
+  if Ham2 is None:
+    Ham2 = tf.matmul(Ham, Ham)
+  
+  norm = calculate_norm(full_psi)
+  Heff_samples = all_states_Heff(full_psi, Ham, dt, phi_phi=norm, Ham2=Ham2)
+  return tf.reduce_sum((tf.conj(full_psi) * Heff_samples)) / norm
 
 
 def all_states_gradient(full_psi, Ham, dt, Ham2=None):
