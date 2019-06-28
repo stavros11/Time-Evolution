@@ -53,7 +53,7 @@ configs = np.zeros([n_samples, n_sites], dtype=np.int32)
 times = np.zeros(n_samples, dtype=np.int32)
 
 
-overlaps = []
+history = {"overlaps": [], "exact_Eloc": [], "sampled_Eloc": []}
 for epoch in range(n_epochs):
   # Sample
   sampler.run(machine.dense(), n_sites, time_steps + 1, 2**n_sites,
@@ -69,13 +69,11 @@ for epoch in range(n_epochs):
   exact_Eloc, _ = full_np.all_states_Heff(machine.dense(), ham, dt, Ham2=ham2)
   exact_Eloc = np.array(exact_Eloc).sum()
 
-  overlaps.append(utils.overlap(machine.dense(), exact_state))
+  history["overlaps"].append(utils.overlap(machine.dense(), exact_state))
+  history["exact_Eloc"].append(exact_Eloc)
+  history["sampled_Eloc"].append(Eloc)
   if epoch % n_message == 0:
     Eloc_error = np.abs((Eloc - exact_Eloc) * 100.0 / exact_Eloc)
     print("\nEpoch: {}".format(epoch))
     print("Sampling/Exact Eloc error: {}%".format(Eloc_error))
-    print("Overlap: {}".format(overlaps[-1]))
-
-
-plt.plot(np.arange(n_epochs), overlaps)
-plt.show()
+    print("Overlap: {}".format(history["overlaps"][-1]))
