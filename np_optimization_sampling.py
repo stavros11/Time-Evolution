@@ -16,13 +16,13 @@ from numpy.ctypeslib import ndpointer
 
 # Model parameters
 n_sites = 4
-time_steps = 50
+time_steps = 20
 t_final = 1.0
 h_init = 0.5
 h_ev = 1.0
 
 # Optimization parameters
-n_epochs = 6000
+n_epochs = 10000
 n_message = 100
 
 # Sampling parameters
@@ -75,5 +75,7 @@ for epoch in range(n_epochs):
   if epoch % n_message == 0:
     Eloc_error = np.abs((Eloc - exact_Eloc) * 100.0 / exact_Eloc)
     print("\nEpoch: {}".format(epoch))
+    print("Sampled Eloc: {}".format(Eloc))
+    print("Exact Eloc: {}".format(exact_Eloc))
     print("Sampling/Exact Eloc error: {}%".format(Eloc_error))
     print("Overlap: {}".format(history["overlaps"][-1]))
