@@ -14,8 +14,8 @@ tf.enable_v2_behavior()
 n_sites = 4
 n_hidden = 4
 h = 1.0
-n_epochs = 1000
-n_message = 200
+n_epochs = 8000
+n_message = 500
 rtype = tf.float64
 ctype = tf.complex128
 

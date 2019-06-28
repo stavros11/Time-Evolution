@@ -107,31 +107,45 @@ class MPSModel(base.BaseModel):
 class RBMModel(base.BaseModel):
 
   def __init__(self, init_state, time_steps, n_hidden, std=1e-3,
-               rtype=tf.float32, ctype=tf.complex64):
+               rtype=tf.float32, ctype=tf.complex64,
+               init_dir="rbm_init_weights"):
     n_sites = int(np.log2(len(init_state)))
     self.time_steps = time_steps
     self.init_state = tf.cast(init_state[np.newaxis], dtype=ctype)
 
-    self.wre = tf.Variable(np.random.normal(0.0, std, size=[time_steps, n_hidden, n_sites]),
-                           dtype=rtype, trainable=True)
-    self.wim = tf.Variable(np.random.normal(0.0, std, size=[time_steps, n_hidden, n_sites]),
-                           dtype=rtype, trainable=True)
-    self.bre = tf.Variable(np.zeros((time_steps, n_hidden)),
-                           dtype=rtype, trainable=True)
-    self.bim = tf.Variable(np.zeros((time_steps, n_hidden)),
-                           dtype=rtype, trainable=True)
-    self.vars = [self.wre, self.wim, self.bre, self.bim]
+    import os
+    norm_dir = "rbm_n{}h{}_w_norm.npy".format(n_sites, n_hidden)
+    w_norm = np.load(os.path.join(os.getcwd(), init_dir, norm_dir))
+    phase_dir = "rbm_n{}h{}_w_phase.npy".format(n_sites, n_hidden)
+    w_phase = np.load(os.path.join(os.getcwd(), init_dir, phase_dir))
+
+    w_norm = self._initialize_time_weights(w_norm, time_steps, std)
+    self.w_norm = tf.Variable(w_norm, dtype=rtype, trainable=True)
+    w_phase = self._initialize_time_weights(w_phase, time_steps, std)
+    self.w_phase = tf.Variable(w_phase, dtype=rtype, trainable=True)
+    self.vars = [self.w_norm, self.w_phase]
 
     all_states = np.array(list(itertools.product([-1, 1], repeat=n_sites)))
     self.all_states = tf.cast(all_states, dtype=rtype)
 
+  @staticmethod
+  def _initialize_time_weights(w0, time_steps, std=1e-3):
+    w = np.array(time_steps * [w0])
+    return w + np.random.normal(0.0, std, size=w.shape)
+
+  @staticmethod
+  def _time_logrbm_forward(w, x):
+    """Forward prop of RBM where w has a time index in 0th axis.
+
+    Einsum notation: t: Time, h: hidden, v: visible, b: batch.
+    """
+    w_x = tf.einsum("thv,bv->thb", w, x)
+    return tf.reduce_sum(tf.cosh(w_x), axis=1)
+
   def variational_wavefunction(self, training=False):
-    w_sigma_re = tf.einsum("thj,sj->ths", self.wre, self.all_states)
-    w_sigma_im = tf.einsum("thj,sj->ths", self.wim, self.all_states)
-    log_re = tf.log(tf.cosh(w_sigma_re + self.bre[:, :, tf.newaxis]))
-    log_im = tf.log(tf.cosh(w_sigma_im + self.bim[:, :, tf.newaxis]))
-    log = tf.reduce_sum(tf.complex(log_re, log_im), axis=1)
-    return tf.exp(log)
+    logpsi_re = self._time_logrbm_forward(self.w_norm, self.all_states)
+    logpsi_im = tf.exp(self._time_logrbm_forward(self.w_phase, self.all_states))
+    return tf.exp(tf.complex(logpsi_re, logpsi_im))
 
 
 class SequentialDenseModel(base.BaseModel):

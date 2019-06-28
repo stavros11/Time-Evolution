@@ -41,9 +41,9 @@ ham2 = tf.cast(ham2, dtype=ctype)
 
 
 # Define TF model
-model = simple.RBMModel(exact_state[0], time_steps, n_hidden=3,
+model = simple.RBMModel(exact_state[0], time_steps, n_hidden=8,
                         rtype=tf.float64, ctype=tf.complex128)
-#model = simple.MPSModel(exact_state[0], time_steps, d_bond=2,
+#model = simple.MPSModel(exact_state[0], time_steps, d_bond=4,
 #                        rtype=tf.float64, ctype=tf.complex128)
 #model = simple.SequentialDenseModel(exact_state[0], time_steps)
 #model = autoregressive.FullAutoregressiveModel(exact_state[0], time_steps)
@@ -67,6 +67,6 @@ for epoch in range(n_epochs):
   model.update(optimizer, updater)
   overlaps.append(model.overlap(exact_state_tf, normalize_states=True).numpy())
   if epoch % n_message == 0:
-    print("Overlap: {}".format(overlaps[-1]))
+    print("Epoch: {},  Overlap: {}".format(epoch, overlaps[-1]))
 
 plt.plot(overlaps)
