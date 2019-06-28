@@ -1,13 +1,21 @@
-"""Optimize tensorflow models that inherit models/base.py.
+"""Optimizes tensorflow models that inherit models/base.py.
+
+Uses all states to perform the optimization.
+Unless otherwise defined, it uses tensorflow automatic gradients for the
+updates.
 
 The model and the updater method should be defined in the script bellow.
+If the model has gradients hard-coded, then the updater should be a function
+that returns the complex gradients.
+If we want to use auto-diff (the model has no hard-coded gradients) then
+the updater should be a function that calculates the local energy loss.
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
-import calculate_energy_tf as en
 import tensorflow as tf
 import utils
+from energy import full_tf as en
 from models import simple
 tf.enable_v2_behavior()
 

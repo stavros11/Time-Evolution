@@ -1,6 +1,6 @@
-"""Simple script to find ground states using the RBM ansatz.
+""" Finds ground states using the RBM ansatz.
 
-To be used for initialization of the RBM for time evolution.
+To be used ONLY for initialization of the RBM for time evolution.
 Assumes no biases.
 """
 

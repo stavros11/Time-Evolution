@@ -1,9 +1,12 @@
-"""Script for testing various modules."""
+"""Optimizes full wavefunction using numpy.
+
+Uses all states to calculate gradients.
+"""
 
 import numpy as np
 import matplotlib.pyplot as plt
-import calculate_energy_full as en
 import utils
+from energy import full_np as en
 
 
 n_sites = 4
@@ -33,11 +36,11 @@ for epoch in range(n_epochs):
                                                      dt, Ham2=ham2)
   complex_grad = Ok_star_Eloc - Ok.conj() * Eloc
   var_state[1:] += optimizer.update(complex_grad, epoch)
-  
+
   overlaps.append(utils.overlap(var_state, exact_state))
   if epoch % 1000 == 0:
     print("Overlap: {}".format(overlaps[-1]))
 
 
 plt.plot(np.arange(n_epochs), overlaps)
-plt.show()  
+plt.show()
