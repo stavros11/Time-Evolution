@@ -8,6 +8,7 @@ import utils
 from numpy.ctypeslib import ndpointer
 from energy import full_np
 from energy import sampling_np
+from machines import full
 
 import matplotlib
 matplotlib.rcParams['mathtext.fontset'] = 'cm'
@@ -35,10 +36,11 @@ ham = utils.tfim_hamiltonian(n_sites, h=h_ev)
 ham2 = ham.dot(ham)
 
 # State to use for sampling
-full_psi = np.copy(exact_state)
+machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
+machine.set_parameters(exact_state)
 
 # Calculate energy exactly
-exact_energy, _ = full_np.all_states_Heff(full_psi, ham, dt, Ham2=ham2)
+exact_energy, _ = full_np.all_states_Heff(exact_state, ham, dt, Ham2=ham2)
 
 
 # Load sampler
@@ -54,14 +56,15 @@ for n_samples in n_samples_list:
   # Sample
   configs = np.zeros([n_samples, n_sites], dtype=np.int32)
   times = np.zeros(n_samples, dtype=np.int32)
-  sampler.run(full_psi, n_sites, time_steps + 1, 2**n_sites,
+  sampler.run(machine.dense(), n_sites, time_steps + 1, 2**n_sites,
               n_samples, 1, 50, configs, times)
 
   # Calculate energy with sampling
-  samp_results = sampling_np.vmc_energy(full_psi, configs, times, dt, h=h_ev)
+  #samp_results = sampling_np.vmc_energy(machine, configs, times, dt, h=h_ev)
+  samp_results = sampling_np.vmc_gradients(machine, configs, times, dt, h=h_ev)
   for i in range(3):
-    energy_means[i].append(samp_results[0][i])
-    energy_stds[i].append(samp_results[1][i])
+    energy_means[i].append(samp_results[-2][i])
+    energy_stds[i].append(samp_results[-1][i])
 
 exact_energy = np.array(exact_energy)
 energy_means = np.array(energy_means)
@@ -94,4 +97,5 @@ for i in range(3):
     plt.xlabel(r'$N_\mathrm{samples}$', fontsize=label_size)
   plt.ylabel('Re STD', fontsize=label_size)
 
-plt.savefig('convergence_test.pdf', bbox_inches='tight')
+plt.show()
+#plt.savefig('convergence_test.pdf', bbox_inches='tight')
