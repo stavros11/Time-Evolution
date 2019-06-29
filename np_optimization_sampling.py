@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import utils
 from energy import full_np
 from energy import sampling_np
-from machines import full
+from machines import full, mps
 from numpy.ctypeslib import ndpointer
 
 
@@ -23,7 +23,7 @@ h_ev = 1.0
 
 # Optimization parameters
 n_epochs = 10000
-n_message = 100
+n_message = 50
 
 # Sampling parameters
 n_samples = 20000
@@ -39,7 +39,8 @@ exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
                                               h0=h_init, h=h_ev)
 
 # Initialize machine
-machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
+# machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
+machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=4)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 # Initialize sampler

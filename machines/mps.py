@@ -17,7 +17,8 @@ class SmallMPSMachine(base.BaseMachine):
     self.dtype = self.tensors.dtype
     self.shape = self.tensors[1:].shape
 
-    self._dense = self._calculate_dense()
+    self._dense = self._create_envs()
+    self.bin_to_dec = 2**np.arange(self.n_sites)
 
   def _dense_to_mps(self, state):
     """Transforms a dense wavefunction to an approximate MPS form."""
@@ -53,7 +54,9 @@ class SmallMPSMachine(base.BaseMachine):
     return u, sv
 
   def _calculate_dense(self):
-    """Calculates the dense form of MPS."""
+    """Calculates the dense form of MPS.
+
+    NOT USED (only for tests)."""
     n = self.n_sites
     d = self.d_phys
     tensors = np.copy(self.tensors).swapaxes(0, 1)
@@ -116,18 +119,23 @@ class SmallMPSMachine(base.BaseMachine):
     configs_bin = (configs < 0).astype(np.int).T
 
     grads = np.zeros((n_samples,) + self.shape[1:], dtype=self.dtype)
-    for i in range(1, self.n_sites - 1):
-      # Handle time indices
-      left_slicer = tuple(configs_bin[j] for j in range(i))
-      left = self.left[i - 1][(times,) + left_slicer]
 
-      right_slicer = tuple(configs_bin[j] for j in range(i + 1, self.n_sites))
-      right = self.right[self.n_sites - i - 2][(times,) + right_slicer]
+    right_slicer = (times,) + tuple(configs_bin[1:])
+    grads[srng, 0, configs_bin[0]] = self.right[-1][right_slicer]
+    for i in range(1, self.n_sites - 1):
+      left_slicer = (times,) + tuple(configs_bin[:i])
+      left = self.left[i - 1][left_slicer]
+
+      right_slicer = (times,) + tuple(configs_bin[i + 1:])
+      right = self.right[self.n_sites - i - 2][right_slicer]
 
       grads[srng, i, configs_bin[i]] = np.einsum("bmi,bjm->bij", left, right)
+
+    left_slicer = (times,) + tuple(configs_bin[:-1])
+    grads[srng, -1, configs_bin[-1]] = self.left[-1][left_slicer]
+
     return grads
 
   def update(self, to_add):
-    self.tensors += to_add
-    #self._dense = self._calculate_dense()
+    self.tensors[1:] += to_add
     self._dense = self._create_envs()
