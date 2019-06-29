@@ -6,7 +6,8 @@ Uses all states to calculate gradients.
 import numpy as np
 import matplotlib.pyplot as plt
 import utils
-from energy import full_np as en
+from energy import full_np
+from machines import full
 
 
 n_sites = 4
@@ -24,20 +25,20 @@ ham2 = ham.dot(ham)
 exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
                                               h0=h_init, h=h_ev)
 
-# Initialize variational state by copying initial condition and adding some noise
-var_state = np.array((time_steps + 1) * [exact_state[0]])
-var_state[1:] += utils.random_normal_complex(var_state[1:].shape, std=1e-2)
-
-optimizer = utils.AdamComplex(var_state[1:].shape, dtype=var_state.dtype)
+# Initialize machine
+machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
+optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 overlaps = []
 for epoch in range(n_epochs):
-  Ok, Ok_star_Eloc, Eloc, _ = en.all_states_gradient(var_state, ham,
-                                                     dt, Ham2=ham2)
+  Ok, Ok_star_Eloc, Eloc, _ = full_np.all_states_sampling_gradient(machine,
+                                                                   ham,
+                                                                   dt,
+                                                                   Ham2=ham2)
   complex_grad = Ok_star_Eloc - Ok.conj() * Eloc
-  var_state[1:] += optimizer.update(complex_grad, epoch)
+  machine.update(optimizer.update(complex_grad, epoch))
 
-  overlaps.append(utils.overlap(var_state, exact_state))
+  overlaps.append(utils.overlap(machine.dense(), exact_state))
   if epoch % 1000 == 0:
     print("Overlap: {}".format(overlaps[-1]))
 

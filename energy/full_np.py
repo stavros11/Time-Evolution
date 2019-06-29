@@ -115,6 +115,7 @@ def all_states_gradient(full_psi, Ham, dt, Ham2=None, psi0=None):
 
 
 def all_states_sampling_gradient(machine, Ham, dt, Ham2=None):
+  """Use only to test the machines written for sampling purposes."""
   if Ham2 is None:
     Ham2 = Ham.dot(Ham)
 
@@ -133,9 +134,10 @@ def all_states_sampling_gradient(machine, Ham, dt, Ham2=None):
   grads = machine.gradient(configs, times)
 
   slicer = (slice(None),) + len(machine.shape) * (np.newaxis,)
-  weight = full_psi2.ravel()
-  Ok = (weight[slicer] * grads).sum(axis=0) / phi_phi
-  weight *= Heff_samples.ravel()
+  weight = full_psi2.ravel()[slicer] * grads
+  Ok = weight.reshape((,) + machine.shape).sum(axis=0) / phi_phi
+
+  weight = weight * Heff_samples.ravel()
   Ok_star_Eloc = (np.conj(grads) * weight).sum(axis=0) / phi_phi
 
   return Ok, Ok_star_Eloc, Eloc, Eloc_terms
