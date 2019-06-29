@@ -6,6 +6,7 @@ calculate expectation values deterministically.
 """
 
 import numpy as np
+import itertools
 
 
 def all_states_Heff(psi_all, Ham, dt, phi_phi=None, Ham2=None, psi0=None):
@@ -109,5 +110,32 @@ def all_states_gradient(full_psi, Ham, dt, Ham2=None, psi0=None):
   if psi0 is None:
     Ok = Ok[1:]
     Ok_star_Eloc = Ok_star_Eloc[1:]
+
+  return Ok, Ok_star_Eloc, Eloc, Eloc_terms
+
+
+def all_states_sampling_gradient(machine, Ham, dt, Ham2=None):
+  if Ham2 is None:
+    Ham2 = Ham.dot(Ham)
+
+  full_psi = machine.dense()
+  full_psi2 = np.abs(full_psi)**2
+  phi_phi = (full_psi2).sum()
+  Eloc_terms, Heff_samples = all_states_Heff(full_psi, Ham, dt,
+                                             phi_phi=phi_phi, Ham2=Ham2)
+  Eloc = (np.conj(full_psi) * Heff_samples).sum() / phi_phi
+
+  N, M = machine.n_sites, machine.time_steps
+  all_configs = np.array(list(itertools.product([-1, 1], repeat=N)))
+  times = np.repeat(np.arange(M + 1), len(all_configs))
+  configs = np.concatenate((M + 1) * [all_configs], axis=0)
+
+  grads = machine.gradient(configs, times)
+
+  slicer = (slice(None),) + len(machine.shape) * (np.newaxis,)
+  weight = full_psi2.ravel()
+  Ok = (weight[slicer] * grads).sum(axis=0) / phi_phi
+  weight *= Heff_samples.ravel()
+  Ok_star_Eloc = (np.conj(grads) * weight).sum(axis=0) / phi_phi
 
   return Ok, Ok_star_Eloc, Eloc, Eloc_terms
