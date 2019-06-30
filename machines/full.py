@@ -7,14 +7,14 @@ from machines import base
 class FullWavefunctionMachine(base.BaseMachine):
 
   def __init__(self, init_state, time_steps):
-    self.n_sites = int(np.log2(len(init_state)))
+    self.n_states = len(init_state)
+    self.n_sites = int(np.log2(self.n_states))
     self.time_steps = time_steps
     # Initialize state
     self.psi = np.array((time_steps + 1) * [init_state])
+    self.psi = self.psi.reshape((time_steps + 1,) + self.n_sites * (2,))
     self.dtype = self.psi.dtype
     self.shape = self.psi[1:].shape
-
-    self.bin_to_dec = 2**np.arange(0, self.n_sites)
 
   def set_parameters(self, psi):
     assert psi.shape == self.psi.shape
@@ -22,23 +22,28 @@ class FullWavefunctionMachine(base.BaseMachine):
     self.dtype = self.psi.dtype
 
   def dense(self):
-    return self.psi
+    return self.psi.reshape((self.time_steps + 1, self.n_states))
 
   def wavefunction(self, configs, times):
-    configs_dec = (configs < 0).dot(self.bin_to_dec)
+    # Configs should be in [0, 1]
+    configs_sl = tuple(configs.T)
+    times_before = np.clip(times - 1, 0, self.time_steps)
+    times_after = np.clip(times + 1, 0, self.time_steps)
 
-    psi_before = self.psi[np.clip(times - 1, 0, self.time_steps), configs_dec]
-    psi_now = self.psi[times, configs_dec]
-    psi_after = self.psi[np.clip(times+1, 0, self.time_steps), configs_dec]
+    psi_before = self.psi[(times_before,) + configs_sl]
+    psi_now = self.psi[(times,) + configs_sl]
+    psi_after = self.psi[(times_after,) + configs_sl]
 
     return np.stack((psi_before, psi_now, psi_after))
 
   def gradient(self, configs, times):
+    # Configs should be in [0, 1]
+    configs_sl = tuple(configs.T)
     n_samples = len(configs)
-    configs_dec = (configs < 0).dot(self.bin_to_dec)
 
-    grads = np.zeros((n_samples, self.psi.shape[-1]), dtype=self.dtype)
-    grads[np.arange(n_samples), configs_dec] = 1.0 / self.psi[times, configs_dec]
+    grads = np.zeros((n_samples,) + self.shape[1:], dtype=self.dtype)
+    grads[(np.arange(n_samples),) + configs_sl] = (1.0 /
+          self.psi[(times,) + configs_sl])
 
     return grads
 

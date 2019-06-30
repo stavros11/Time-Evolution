@@ -30,15 +30,21 @@ machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 overlaps = []
+full_psi = machine.dense()
 for epoch in range(n_epochs):
   Ok, Ok_star_Eloc, Eloc, _ = full_np.all_states_sampling_gradient(machine,
                                                                    ham,
                                                                    dt,
                                                                    Ham2=ham2)
-  complex_grad = Ok_star_Eloc - Ok.conj() * Eloc
-  machine.update(optimizer.update(complex_grad, epoch))
 
-  overlaps.append(utils.overlap(machine.dense(), exact_state))
+  grad = Ok_star_Eloc - Ok.conj() * Eloc
+  if grad.shape[1:] != machine.shape[1:]:
+    grad = grad.reshape((time_steps,) + machine.shape[1:])
+
+  machine.update(optimizer.update(grad, epoch))
+  full_psi = machine.dense()
+
+  overlaps.append(utils.overlap(full_psi, exact_state))
   if epoch % 1000 == 0:
     print("Overlap: {}".format(overlaps[-1]))
 
