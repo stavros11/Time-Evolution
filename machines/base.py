@@ -13,6 +13,7 @@ class BaseMachine:
     self.time_steps = time_steps
     self.dtype = None # Type of the variational parameters
     self.shape = None # Shape of the variational parameters
+    self.name = None # Name (str) of the machine for saving purposes
 
   def dense(self):
     """Calculates the dense (full wavefunction) form of the machine.

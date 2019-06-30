@@ -12,6 +12,7 @@ class SmallMPSMachine(base.BaseMachine):
     self.n_sites = int(np.log2(self.n_states))
     self.time_steps = time_steps
     self.d_bond, self.d_phys = d_bond, d_phys
+    self.name = "mpsD{}".format(d_bond)
 
     tensors = np.array((time_steps + 1) * [self._dense_to_mps(init_state)])
     self.tensors = tensors.transpose([0, 1, 3, 2, 4])

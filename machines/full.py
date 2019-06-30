@@ -15,6 +15,7 @@ class FullWavefunctionMachine(base.BaseMachine):
     self.psi = self.psi.reshape((time_steps + 1,) + self.n_sites * (2,))
     self.dtype = self.psi.dtype
     self.shape = self.psi[1:].shape
+    self.name = "fullwv"
 
   def set_parameters(self, psi):
     assert psi.shape == self.psi.shape

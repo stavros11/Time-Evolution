@@ -5,6 +5,7 @@ Uses sampling to calculate gradients.
 
 import os
 import ctypes
+import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 import utils
@@ -80,3 +81,11 @@ for epoch in range(n_epochs):
     print("Exact Eloc: {}".format(exact_Eloc))
     print("Sampling/Exact Eloc error: {}%".format(Eloc_error))
     print("Overlap: {}".format(history["overlaps"][-1]))
+
+# Save history
+filename = "sampling{}_{}_N{}M{}.h5py".format(n_samples, machine.name,
+                    n_sites, time_steps)
+file = h5py.File("histories/{}".format(filename), "w")
+for k in history.keys():
+  file[k] = history[k]
+file.close()
