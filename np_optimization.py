@@ -7,15 +7,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import utils
 from energy import full_np
-from machines import full
+from machines import full, mps
 
 
 n_sites = 4
 time_steps = 100
 t_final = 1.0
-h_init = 0.5
-h_ev = 1.0
+h_init = 1.0
+h_ev = 0.5
 n_epochs = 12000
+n_message = 500
 
 t_grid = np.linspace(0.0, t_final, time_steps + 1)
 dt = t_grid[1] - t_grid[0]
@@ -27,6 +28,7 @@ exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
 
 # Initialize machine
 machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
+#machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=4)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 overlaps = []
@@ -45,7 +47,7 @@ for epoch in range(n_epochs):
   full_psi = machine.dense()
 
   overlaps.append(utils.overlap(full_psi, exact_state))
-  if epoch % 1000 == 0:
+  if epoch % n_message == 0:
     print("Overlap: {}".format(overlaps[-1]))
 
 

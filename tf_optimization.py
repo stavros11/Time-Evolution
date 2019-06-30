@@ -49,10 +49,10 @@ ham2 = tf.cast(ham2, dtype=ctype)
 
 
 # Define TF model
-model = simple.RBMModel(exact_state[0], time_steps, n_hidden=8,
-                        rtype=tf.float64, ctype=tf.complex128)
-#model = simple.MPSModel(exact_state[0], time_steps, d_bond=4,
+#model = simple.RBMModel(exact_state[0], time_steps, n_hidden=8,
 #                        rtype=tf.float64, ctype=tf.complex128)
+model = simple.MPSModel(exact_state[0], time_steps, d_bond=4,
+                        rtype=tf.float64, ctype=tf.complex128)
 #model = simple.SequentialDenseModel(exact_state[0], time_steps)
 #model = autoregressive.FullAutoregressiveModel(exact_state[0], time_steps)
 

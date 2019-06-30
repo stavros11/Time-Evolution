@@ -8,7 +8,8 @@ class SmallMPSMachine(base.BaseMachine):
   """MPS machine for small systems - uses dense wavefunctions."""
 
   def __init__(self, init_state, time_steps, d_bond, d_phys=2):
-    self.n_sites = int(np.log2(len(init_state)))
+    self.n_states = len(init_state)
+    self.n_sites = int(np.log2(self.n_states))
     self.time_steps = time_steps
     self.d_bond, self.d_phys = d_bond, d_phys
 
@@ -56,7 +57,12 @@ class SmallMPSMachine(base.BaseMachine):
   def _calculate_dense(self):
     """Calculates the dense form of MPS.
 
-    NOT USED (only for tests)."""
+    NOT USED (only for tests).
+
+    Note that currently tests are broken because _calculate_dense returns
+    the dense in (M+1, 2**N), while _create_envs returns the dense in
+    (M+1, 2, 2, ..., 2) shape. We are currently following the latter convention.
+    """
     n = self.n_sites
     d = self.d_phys
     tensors = np.copy(self.tensors).swapaxes(0, 1)
@@ -97,44 +103,49 @@ class SmallMPSMachine(base.BaseMachine):
 
     expr = self._expr(self.SYMBOLS[:self.n_sites - 1],
                       self.SYMBOLS[self.n_sites - 1])
-    full = np.einsum(expr, self.left[-1], self.tensors[:, -1])
-    dense = np.trace(full, axis1=-2, axis2=-1)
-    return dense.reshape((self.time_steps + 1, 2**self.n_sites))
+    dense = np.einsum(expr, self.left[-1], self.tensors[:, -1])
+    return np.trace(dense, axis1=-2, axis2=-1)
 
   def dense(self):
-    return self._dense
+    return self._dense.reshape((self.time_steps + 1, self.n_states))
 
   def wavefunction(self, configs, times):
-    configs_dec = (configs < 0).dot(self.bin_to_dec)
+    # Configs should be in {0, 1} convention
+    configs_sl = tuple(configs.T)
+    times_before = np.clip(times - 1, 0, self.time_steps)
+    times_after = np.clip(times + 1, 0, self.time_steps)
 
-    psi_before = self._dense[np.clip(times - 1, 0, self.time_steps), configs_dec]
-    psi_now = self._dense[times, configs_dec]
-    psi_after = self._dense[np.clip(times + 1, 0, self.time_steps), configs_dec]
+    psi_before = self._dense[(times_before,) + configs_sl]
+    psi_now = self._dense[(times,) + configs_sl]
+    psi_after = self._dense[(times_after,) + configs_sl]
 
     return np.stack((psi_before, psi_now, psi_after))
 
   def gradient(self, configs, times):
+    # Configs should be in {0, 1} convention
+    configs_t = configs.T
     n_samples = len(configs)
     srng = np.arange(n_samples)
-    configs_bin = (configs < 0).astype(np.int).T
 
     grads = np.zeros((n_samples,) + self.shape[1:], dtype=self.dtype)
 
-    right_slicer = (times,) + tuple(configs_bin[1:])
-    grads[srng, 0, configs_bin[0]] = self.right[-1][right_slicer]
+    right_slicer = (times,) + tuple(configs_t[1:])
+    grads[srng, 0, configs_t[0]] = self.right[-1][right_slicer].swapaxes(-2, -1)
     for i in range(1, self.n_sites - 1):
-      left_slicer = (times,) + tuple(configs_bin[:i])
+      left_slicer = (times,) + tuple(configs_t[:i])
       left = self.left[i - 1][left_slicer]
 
-      right_slicer = (times,) + tuple(configs_bin[i + 1:])
+      right_slicer = (times,) + tuple(configs_t[i + 1:])
       right = self.right[self.n_sites - i - 2][right_slicer]
 
-      grads[srng, i, configs_bin[i]] = np.einsum("bmi,bjm->bij", left, right)
+      grads[srng, i, configs_t[i]] = np.einsum("bmi,bjm->bij", left, right)
 
-    left_slicer = (times,) + tuple(configs_bin[:-1])
-    grads[srng, -1, configs_bin[-1]] = self.left[-1][left_slicer]
+    left_slicer = (times,) + tuple(configs_t[:-1])
+    grads[srng, -1, configs_t[-1]] = self.left[-1][left_slicer].swapaxes(-2, -1)
 
-    return grads
+    dense_slicer = (times,) + tuple(configs_t)
+    dense_slicer += (len(self.shape) - 1) * (np.newaxis,)
+    return grads / self._dense[dense_slicer]
 
   def update(self, to_add):
     self.tensors[1:] += to_add
