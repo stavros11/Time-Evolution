@@ -116,28 +116,32 @@ def all_states_gradient(full_psi, Ham, dt, Ham2=None, psi0=None):
 
 def all_states_sampling_gradient(machine, Ham, dt, Ham2=None):
   """Use only to test the machines written for sampling purposes."""
+  N, M = machine.n_sites, machine.time_steps
   if Ham2 is None:
     Ham2 = Ham.dot(Ham)
 
   full_psi = machine.dense()
-  full_psi2 = np.abs(full_psi)**2
-  phi_phi = (full_psi2).sum()
+  phi_phi = (np.abs(full_psi)**2).sum()
   Eloc_terms, Heff_samples = all_states_Heff(full_psi, Ham, dt,
                                              phi_phi=phi_phi, Ham2=Ham2)
   Eloc = (np.conj(full_psi) * Heff_samples).sum() / phi_phi
 
-  N, M = machine.n_sites, machine.time_steps
-  all_configs = np.array(list(itertools.product([-1, 1], repeat=N)))
-  times = np.repeat(np.arange(M + 1), len(all_configs))
+  all_configs = np.array(list(itertools.product([0, 1], repeat=N)))
+  n_states = len(all_configs)
+
+  times = np.repeat(np.arange(M + 1), n_states)
   configs = np.concatenate((M + 1) * [all_configs], axis=0)
 
-  grads = machine.gradient(configs, times)
+  psi_samples = machine.wavefunction(configs, times)[1]
+  grad_samples = machine.gradient(configs, times)
 
-  slicer = (slice(None),) + len(machine.shape) * (np.newaxis,)
-  weight = full_psi2.ravel()[slicer] * grads
-  Ok = weight.reshape((,) + machine.shape).sum(axis=0) / phi_phi
+  slicer = (slice(None),) + (len(machine.shape) - 1) * (np.newaxis,)
+  weights = np.abs(psi_samples[slicer])**2 * grad_samples
 
-  weight = weight * Heff_samples.ravel()
-  Ok_star_Eloc = (np.conj(grads) * weight).sum(axis=0) / phi_phi
+  weights = weights.reshape((M + 1, n_states) + machine.shape[1:])
+  Ok = weights.sum(axis=1) / phi_phi
+  slicer = (slice(None),) + slicer
+  Heff_samples = Heff_samples / full_psi
+  Ok_star_Eloc = (np.conj(weights) * Heff_samples[slicer]).sum(axis=1) / phi_phi
 
-  return Ok, Ok_star_Eloc, Eloc, Eloc_terms
+  return Ok[1:], Ok_star_Eloc[1:], Eloc, Eloc_terms
