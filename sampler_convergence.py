@@ -37,7 +37,8 @@ ham2 = ham.dot(ham)
 
 # State to use for sampling
 machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine.set_parameters(exact_state)
+machine.set_parameters(exact_state.reshape(
+    (time_steps + 1,) + machine.shape[1:]))
 
 # Calculate energy exactly
 exact_energy, _ = full_np.all_states_Heff(exact_state, ham, dt, Ham2=ham2)
