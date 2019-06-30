@@ -15,7 +15,7 @@ time_steps = 100
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
-n_epochs = 12000
+n_epochs = 10000
 n_message = 500
 
 t_grid = np.linspace(0.0, t_final, time_steps + 1)
@@ -31,7 +31,7 @@ machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
 #machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=4)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
-overlaps = []
+history = {"overlaps" : [], "exact_Eloc": []}
 full_psi = machine.dense()
 for epoch in range(n_epochs):
   Ok, Ok_star_Eloc, Eloc, _ = full_np.all_states_sampling_gradient(machine,
@@ -46,10 +46,9 @@ for epoch in range(n_epochs):
   machine.update(optimizer.update(grad, epoch))
   full_psi = machine.dense()
 
-  overlaps.append(utils.overlap(full_psi, exact_state))
+  history["exact_Eloc"].append(Eloc)
+  history["overlaps"].append(utils.overlap(full_psi, exact_state))
   if epoch % n_message == 0:
-    print("Overlap: {}".format(overlaps[-1]))
-
-
-plt.plot(np.arange(n_epochs), overlaps)
-plt.show()
+    print("\nEpoch {}".format(epoch))
+    print("Eloc: {}".format(history["exact_Eloc"][-1]))
+    print("Overlap: {}".format(history["overlaps"][-1]))

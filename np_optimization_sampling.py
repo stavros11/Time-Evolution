@@ -18,12 +18,12 @@ from numpy.ctypeslib import ndpointer
 n_sites = 4
 time_steps = 20
 t_final = 1.0
-h_init = 0.5
-h_ev = 1.0
+h_init = 1.0
+h_ev = 0.5
 
 # Optimization parameters
 n_epochs = 10000
-n_message = 50
+n_message = 200
 
 # Sampling parameters
 n_samples = 20000
