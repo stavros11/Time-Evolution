@@ -110,8 +110,8 @@ class SmallMPSMachine(base.BaseMachine):
     return self._dense.reshape((self.time_steps + 1, self.n_states))
 
   def wavefunction(self, configs, times):
-    # Configs should be in {0, 1} convention
-    configs_sl = tuple(configs.T)
+    # Configs should be in {-1, 1} convention
+    configs_sl = tuple((configs < 0).astype(configs.dtype).T)
     times_before = np.clip(times - 1, 0, self.time_steps)
     times_after = np.clip(times + 1, 0, self.time_steps)
 
@@ -122,8 +122,8 @@ class SmallMPSMachine(base.BaseMachine):
     return np.stack((psi_before, psi_now, psi_after))
 
   def gradient(self, configs, times):
-    # Configs should be in {0, 1} convention
-    configs_t = configs.T
+    # Configs should be in {-1, 1} convention
+    configs_t = (configs < 0).astype(configs.dtype).T
     n_samples = len(configs)
     srng = np.arange(n_samples)
 

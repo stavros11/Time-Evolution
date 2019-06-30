@@ -25,8 +25,8 @@ class FullWavefunctionMachine(base.BaseMachine):
     return self.psi.reshape((self.time_steps + 1, self.n_states))
 
   def wavefunction(self, configs, times):
-    # Configs should be in [0, 1]
-    configs_sl = tuple(configs.T)
+    # Configs should be in {-1, 1}
+    configs_sl = tuple((configs < 0).astype(configs.dtype).T)
     times_before = np.clip(times - 1, 0, self.time_steps)
     times_after = np.clip(times + 1, 0, self.time_steps)
 
@@ -37,8 +37,8 @@ class FullWavefunctionMachine(base.BaseMachine):
     return np.stack((psi_before, psi_now, psi_after))
 
   def gradient(self, configs, times):
-    # Configs should be in [0, 1]
-    configs_sl = tuple(configs.T)
+    # Configs should be in {-1, 1}
+    configs_sl = tuple((configs < 0).astype(configs.dtype).T)
     n_samples = len(configs)
 
     grads = np.zeros((n_samples,) + self.shape[1:], dtype=self.dtype)

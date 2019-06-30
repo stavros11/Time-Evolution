@@ -126,7 +126,7 @@ def all_states_sampling_gradient(machine, Ham, dt, Ham2=None):
                                              phi_phi=phi_phi, Ham2=Ham2)
   Eloc = (np.conj(full_psi) * Heff_samples).sum() / phi_phi
 
-  all_configs = np.array(list(itertools.product([0, 1], repeat=N)))
+  all_configs = np.array(list(itertools.product([1, -1], repeat=N)))
   n_states = len(all_configs)
 
   times = np.repeat(np.arange(M + 1), n_states)
