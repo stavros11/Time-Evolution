@@ -11,7 +11,7 @@ from energy import full_np
 from machines import full, mps
 
 
-n_sites = 4
+n_sites = 6
 time_steps = 20
 t_final = 1.0
 h_init = 1.0
@@ -29,7 +29,7 @@ exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
 
 # Initialize machine
 #machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=4)
+machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=2)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 history = {"overlaps" : [], "exact_Eloc": []}
