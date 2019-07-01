@@ -26,7 +26,8 @@ class SmallMPSMachine(base.BaseMachine):
     """Transforms a dense wavefunction to an approximate MPS form."""
     tensors = [state[np.newaxis, :, np.newaxis]]
     while len(tensors) < self.n_sites:
-      tensors = [m for t in tensors for m in self._svd_split(t)]
+      tensors[-1], temp = self._svd_split(tensors[-1])
+      tensors.append(temp)
 
     array = np.zeros([self.n_sites, self.d_bond, self.d_phys, self.d_bond],
                      dtype=state.dtype)
@@ -46,13 +47,12 @@ class SmallMPSMachine(base.BaseMachine):
       with d' = sqrt(d) and Dm = d' min(Dl, Dr)
     """
     Dl, d, Dr = m.shape
-    d_new = int(np.sqrt(d))
-    u, s, v = np.linalg.svd(m.reshape(Dl * d_new, Dr * d_new))
-    d_middle = min(u.shape[-1], v.shape[0])
-    s = np.diag(s[:d_middle])
+    u, s, v = np.linalg.svd(m.reshape(Dl * 2, Dr * d // 2))
+    D_middle = min(u.shape[-1], v.shape[0])
+    s = np.diag(s[:D_middle])
 
-    u = u[:, :d_middle].reshape((Dl, d_new, d_middle))
-    sv = s.dot(v[:d_middle]).reshape((d_middle, d_new, Dr))
+    u = u[:, :D_middle].reshape((Dl, 2, D_middle))
+    sv = s.dot(v[:D_middle]).reshape((D_middle, d // 2, Dr))
     return u, sv
 
   def _calculate_dense(self):
