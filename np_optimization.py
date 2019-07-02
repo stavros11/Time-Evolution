@@ -12,7 +12,7 @@ from machines import full, mps
 
 
 n_sites = 6
-time_steps = 20
+time_steps = 50
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
@@ -28,14 +28,14 @@ exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
                                               h0=h_init, h=h_ev)
 
 # Initialize machine
-#machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=2)
+machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
+#machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=2)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 history = {"overlaps" : [], "exact_Eloc": []}
 full_psi = machine.dense()
 for epoch in range(n_epochs):
-  Ok, Ok_star_Eloc, Eloc, _ = full_np.all_states_sampling_gradient(machine,
+  Ok, Ok_star_Eloc, Eloc, _ = full_np.all_states_gradient(full_psi,
                                                                    ham,
                                                                    dt,
                                                                    Ham2=ham2)

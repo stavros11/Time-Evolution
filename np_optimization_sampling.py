@@ -16,7 +16,7 @@ from numpy.ctypeslib import ndpointer
 
 
 # Model parameters
-n_sites = 4
+n_sites = 6
 time_steps = 20
 t_final = 1.0
 h_init = 1.0
@@ -27,7 +27,7 @@ n_epochs = 10000
 n_message = 200
 
 # Sampling parameters
-n_samples = 50000
+n_samples = 20000
 n_corr = 1
 n_burn = 50
 
@@ -40,8 +40,8 @@ exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
                                               h0=h_init, h=h_ev)
 
 # Initialize machine
-#machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=2)
+machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
+#machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=2)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 # Initialize sampler
