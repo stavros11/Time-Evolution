@@ -12,11 +12,11 @@ from machines import full, mps
 
 
 n_sites = 6
-time_steps = 20
+time_steps = 100
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
-n_epochs = 10000
+n_epochs = 40000
 n_message = 500
 
 t_grid = np.linspace(0.0, t_final, time_steps + 1)
@@ -29,7 +29,7 @@ exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
 
 # Initialize machine
 #machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=3)
+machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=6)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 history = {"overlaps" : [], "avg_overlaps": [], "exact_Eloc": []}
@@ -45,6 +45,7 @@ for epoch in range(n_epochs):
     grad = grad.reshape((time_steps,) + machine.shape[1:])
 
   machine.update(optimizer.update(grad, epoch))
+  #machine.update(-grad  / np.sqrt((np.abs(grad)**2).mean()))
   full_psi = machine.dense()
 
   history["exact_Eloc"].append(Eloc)
@@ -62,3 +63,7 @@ file = h5py.File("histories/{}".format(filename), "w")
 for k in history.keys():
   file[k] = history[k]
 file.close()
+
+# Save final dense wavefunction
+filename = "{}.npy".format(filename[:-4])
+np.save("final_dense/{}".format(filename), full_psi)
