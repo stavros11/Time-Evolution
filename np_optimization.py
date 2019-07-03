@@ -28,14 +28,14 @@ exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
                                               h0=h_init, h=h_ev)
 
 # Initialize machine
-#machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=4)
+machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
+#machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=6)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 history = {"overlaps" : [], "avg_overlaps": [], "exact_Eloc": []}
 full_psi = machine.dense()
 for epoch in range(n_epochs):
-  Ok, Ok_star_Eloc, Eloc, _ = full_np.all_states_sampling_gradient(machine,
+  Ok, Ok_star_Eloc, Eloc, _ = full_np.all_states_gradient(full_psi,
                                                                    ham,
                                                                    dt,
                                                                    Ham2=ham2)

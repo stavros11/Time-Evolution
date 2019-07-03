@@ -17,7 +17,7 @@ from numpy.ctypeslib import ndpointer
 
 # Model parameters
 n_sites = 6
-time_steps = 20
+time_steps = 35
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
