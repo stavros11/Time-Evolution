@@ -19,11 +19,11 @@ matplotlib.rcParams.update({'font.size': 22})
 
 # System parameters
 n_sites = 4
-time_steps = 40
+time_steps = 39
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
-n_samples_list = [1000, 1500, 3000, 5000, 10000, 15000, 20000,
+n_samples_list = [1000, 3000, 5000, 10000, 15000, 20000,
                   25000, 30000, 35000, 40000, 45000, 50000, 60000]
 
 
@@ -45,20 +45,21 @@ exact_energy, _ = full_np.all_states_Heff(exact_state, ham, dt, Ham2=ham2)
 
 
 # Load sampler
-sampler = ctypes.CDLL(os.path.join(os.getcwd(), "samplers", "qtvmclib.so"))
+sampler = ctypes.CDLL(os.path.join(os.getcwd(), "samplers", "spacevmclib.so"))
 sampler.run.argtypes = ([ndpointer(np.complex128, flags="C_CONTIGUOUS")] + 6 * [ctypes.c_int] +
-                        [ndpointer(ctypes.c_int, flags="C_CONTIGUOUS"),
-                         ndpointer(ctypes.c_int, flags="C_CONTIGUOUS")])
+                        [ndpointer(ctypes.c_int, flags="C_CONTIGUOUS")])
 sampler.run.restype = None
 
 energy_means = [[], [], []]
 energy_stds = [[], [], []]
 for n_samples in n_samples_list:
   # Sample
+  assert n_samples % (time_steps + 1) == 0
+  n_samples_per_time = n_samples // (time_steps + 1)
   configs = np.zeros([n_samples, n_sites], dtype=np.int32)
-  times = np.zeros(n_samples, dtype=np.int32)
+  times = np.repeat(np.arange(time_steps + 1), n_samples_per_time)
   sampler.run(machine.dense(), n_sites, time_steps + 1, 2**n_sites,
-              n_samples, 1, 50, configs, times)
+              n_samples_per_time, 1, 10, configs)
 
   # Calculate energy with sampling
   #samp_results = sampling_np.vmc_energy(machine, configs, times, dt, h=h_ev)

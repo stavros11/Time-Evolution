@@ -3,17 +3,13 @@
 #include <vector>
 #include <cstdlib>
 
-class QTVMC_FullWV {
+class SpaceMC_FullWV {
   // Number of sites
   int N_;
-  // Number of time steps
-  int M_;
   // Current spin configuration
   std::vector<int> spin_conf_;
-  // Current time
-  int time_;
-  // Full wavefunction (shape (M + 1, 2^N))
-  std::vector<std::vector<std::complex<double> > > full_psi_;
+  // Full wavefunction on a specific time (shape (2^N,))
+  std::vector<std::complex<double> > full_psi_;
   // Current probability
   double prob_;
   // Vector that takes you from binary to decimal
@@ -24,20 +20,15 @@ class QTVMC_FullWV {
     for (int i = 0; i < N_; i++) {
       conf_dec += bin2dec_[N_ - i - 1] * (1 - spin_conf_[i]) / 2;
     }
-    double prob = std::abs(full_psi_[time_][conf_dec]);
+    double prob = std::abs(full_psi_[conf_dec]);
     return prob * prob;
   }
 
  public:
-  void initialize(const int N,
-                  const std::vector<std::vector<std::complex<double> > >& psi) {
+  void initialize(const int N) {
     // Set random seed
     srand(time(NULL));
-
-    // Initialize wavefunction
-    full_psi_ = psi;
     N_ = N;
-    M_ = full_psi_.size();
 
     // Initialize configuration and bin2dec
     spin_conf_.push_back(2 * (rand() % 2) - 1);
@@ -46,10 +37,6 @@ class QTVMC_FullWV {
       spin_conf_.push_back(2 * (rand() % 2) - 1);
       bin2dec_.push_back(2 * bin2dec_[i - 1]);
     }
-    time_ = rand() % M_;
-
-    // Find probability of current configuration
-    prob_ = FindProb();
   }
 
   void spin_flip() {
@@ -68,33 +55,20 @@ class QTVMC_FullWV {
     }
   }
 
-  void time_flip() {
-    int time_add = rand() % M_;
-    time_ = (time_ + time_add) % M_;
-
-    double new_prob = FindProb();
-
-    float r = static_cast<double>(rand()) / static_cast<double>(RAND_MAX);
-    if (new_prob / prob_ > r) {
-      // Accept move
-      prob_ = new_prob;
-    } else {
-      // Return to the old configuration
-      time_ = (time_ - time_add + M_) % M_;
-    }
+  void set_psi(const std::vector<std::complex<double> >& psi) {
+   // To change psi when we change time
+   full_psi_ = psi;
+   prob_ = FindProb();
   }
-
-  int current_time() { return time_; }
 
   std::vector<int> current_config() { return spin_conf_; }
 };
 
 extern "C" void run(std::complex<double>* psi, int N, int M, int Nstates,
-                    int Nsamples, int Ncorr, int Nburn, int* confs,
-                    int* times) {
-  // int Nsamples = 1000, Ncorr = 1, Nburn = 10;
+                    int Nsamples, int Ncorr, int Nburn, int* confs) {
+  // Nsamples, Ncorr and Nburn are per time step!
 
-  QTVMC_FullWV sampler;
+  SpaceMC_FullWV sampler;
   std::vector<std::complex<double> > psi_t(Nstates);
   std::vector<std::vector<std::complex<double> > > psiv;
 
@@ -110,28 +84,28 @@ extern "C" void run(std::complex<double>* psi, int N, int M, int Nstates,
 
   // std::cout << "Psi initialized" << std::endl;
 
-  sampler.initialize(N, psiv);
+  sampler.initialize(N);
 
   //  std::cout << "Sampler initialized" << std::endl;
 
-  for (int i = 0; i < Nburn; i++) {
-    sampler.spin_flip();
-    sampler.time_flip();
-  }
+  for (int it = 0; it < M; it++) {
+   sampler.set_psi(psiv[it]);
 
-  // std::cout << "Burn in completed" << std::endl;
+   // Burn in sweeps
+   for (int i = 0; i < Nburn; i++) {
+     sampler.spin_flip();
+   }
 
+   // Statistics sweeps
   for (int i = 0; i < Nsamples; i++) {
     for (int j = 0; j < Ncorr; j++) {
       sampler.spin_flip();
-      sampler.time_flip();
     }
-    times[i] = sampler.current_time();
     std::vector<int> current_conf = sampler.current_config();
     for (int j = 0; j < N; j++) {
-      confs[N * i + j] = current_conf[j];
+      confs[N * Nsamples * it + N * i + j] = current_conf[j];
     }
   }
-
-  // std::cout << "Samples calculated" << std::endl;
+ }
+// std::cout << "Samples calculated" << std::endl;
 }
