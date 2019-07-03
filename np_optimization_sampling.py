@@ -21,14 +21,14 @@ time_steps = 35
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
-sample_time = False
+sample_time = True
 
 # Optimization parameters
 n_epochs = 10000
 n_message = 200
 
 # Sampling parameters (per time when using the space only sampler)
-n_samples = 1000
+n_samples = 20000
 n_corr = 1
 n_burn = 10
 
