@@ -12,11 +12,11 @@ from machines import full, mps
 
 
 n_sites = 6
-time_steps = 100
+time_steps = 35
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
-n_epochs = 40000
+n_epochs = 10000
 n_message = 500
 
 t_grid = np.linspace(0.0, t_final, time_steps + 1)
@@ -29,7 +29,7 @@ exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
 
 # Initialize machine
 #machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=6)
+machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=4)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 history = {"overlaps" : [], "avg_overlaps": [], "exact_Eloc": []}
