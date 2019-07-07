@@ -90,9 +90,7 @@ class MPSModel(base.BaseModel):
     sv = s.dot(v[:d_middle]).reshape((d_middle, d_new, Dr))
     return u, sv
 
-  def variational_wavefunction(self, training=False):
-    """Calculates the dense form of MPS."""
-    tensors = tf.complex(self.real, self.imag)
+  def _contract_tensors(self, tensors):
     n = int(tensors.shape[0])
     d = self.d_phys
     while n > 1:
@@ -102,6 +100,11 @@ class MPSModel(base.BaseModel):
       tensors = tf.reshape(tensors,
                            (n, self.time_steps, d, self.d_bond, self.d_bond))
     return tf.linalg.trace(tensors[0])
+
+  def variational_wavefunction(self, training=False):
+    """Calculates the dense form of MPS."""
+    return self._contract_tensors(tf.complex(self.real, self.imag))
+
 
 
 class RBMModel(base.BaseModel):

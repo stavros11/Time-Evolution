@@ -58,6 +58,7 @@ class BaseModel:
 
     grads = tape.gradient(eloc, self.vars)
     optimizer.apply_gradients(zip(grads, self.vars))
+    return eloc
 
   def wavefunction(self, training=False):
     """Calculates the current full wavefunction of the model.

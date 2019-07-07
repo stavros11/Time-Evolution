@@ -15,22 +15,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import utils
-from energy import full_tf as en
+from energy import full_tf
 from models import simple
+from models import propagator
 tf.enable_v2_behavior()
 
 
 # System parameters
 n_sites = 4
-time_steps = 100
+time_steps = 20
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
 
 # Optimization parameters
-ctype = tf.complex128
-n_epochs = 30000
-n_message = 500
+ctype = tf.complex64
+n_epochs = 10000
+n_message = 5
 optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
 
 
@@ -51,8 +52,10 @@ ham2 = tf.cast(ham2, dtype=ctype)
 # Define TF model
 #model = simple.RBMModel(exact_state[0], time_steps, n_hidden=8,
 #                        rtype=tf.float64, ctype=tf.complex128)
-model = simple.MPSModel(exact_state[0], time_steps, d_bond=4,
-                        rtype=tf.float64, ctype=tf.complex128)
+#model = simple.MPSModel(exact_state[0], time_steps, d_bond=4,
+#                        rtype=tf.float64, ctype=tf.complex128)
+model = propagator.MPSLSTM(exact_state[0], time_steps, d_bond=4,
+                           rtype=tf.float32, ctype=tf.complex64)
 #model = simple.SequentialDenseModel(exact_state[0], time_steps)
 #model = autoregressive.FullAutoregressiveModel(exact_state[0], time_steps)
 
@@ -61,20 +64,22 @@ model = simple.MPSModel(exact_state[0], time_steps, d_bond=4,
 # only one of the two cases can be used
 
 # Case 1: updater is a function that returns Eloc and auto diff is used.
-updater = lambda psi: tf.real(en.all_states_Eloc(psi, ham, dt, Ham2=ham2))
+updater = lambda psi: tf.real(full_tf.all_states_Eloc(psi, ham, dt, Ham2=ham2))
 
 # Case 2: updater is a function that returns the complex gradients
 #def updater(full_psi, dt=dt):
-#  Ok, Ok_star_Eloc, Eloc = en.all_states_gradient(full_psi, ham, dt, Ham2=ham2)
+#  Ok, Ok_star_Eloc, Eloc = full_tf.all_states_gradient(full_psi, ham, dt, Ham2=ham2)
 #  return Ok_star_Eloc - tf.conj(Ok) * Eloc
 
 
 # Optimize
-overlaps = []
+history = {"overlaps": [], "exact_Eloc": []}
 for epoch in range(n_epochs):
-  model.update(optimizer, updater)
-  overlaps.append(model.overlap(exact_state_tf, normalize_states=True).numpy())
+  history["exact_Eloc"].append(model.update(optimizer, updater))
+  history["overlaps"].append(model.overlap(exact_state_tf, normalize_states=True).numpy())
   if epoch % n_message == 0:
-    print("Epoch: {},  Overlap: {}".format(epoch, overlaps[-1]))
+    print("\nEpoch: {}".format(epoch))
+    print("Overlap: {}".format(history["overlaps"][-1]))
+    print("Exact Eloc: {}".format(history["exact_Eloc"][-1]))
 
-plt.plot(overlaps)
+plt.plot(history["overlaps"])
