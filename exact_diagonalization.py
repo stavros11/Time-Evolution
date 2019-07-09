@@ -49,7 +49,7 @@ def construct_sparse_clock(ham, dt, time_steps, init_penalty=0.0, psi0=None):
   return clock
 
 
-def solve_evolution_system(clock, psi0, solver):
+def solve_evolution_system(clock, psi0, solver, print_info=True):
   """Finds evolution for a given initial state by solving the Clock system.
 
   Notice the 1 / np.sqrt(T + 1) for the initial condition that normalizes the
@@ -58,17 +58,23 @@ def solve_evolution_system(clock, psi0, solver):
   Args:
     clock: Clock Hamiltonian (without penalty term), as constructed by
       `construct_sparse_clock`.
-    psi0: Initial condition wavefunction as an array of (2**n_sites,).
+    psi0: Initial condition wavefunction as an array of (2**N,).
     solver: A scipy.sparse.linalg solver method (such as gmres) to solve
       the linear system.
+    print_info: If True it prints whether the iteration solver converged.
 
   Returns:
-    Whatever the solver returns, usually (solution, info).
+    Evolution state array of shape (T + 1, 2**N).
   """
   dim_space = len(psi0)
-  norm = np.sqrt(clock.shape[0] // dim_space)
+  time_steps = clock.shape[0] // dim_space - 1
+  norm = np.sqrt(time_steps + 1)
+
   lhs = clock[dim_space:, dim_space:]
   rhs = - clock[dim_space:, :dim_space].dot(psi0) / norm
-  return solver(lhs, rhs)
+  Psi, info = solver(lhs, rhs)
+  if print_info:
+    print("Convergence status: {}".format(info))
 
-
+  sol = Psi.reshape((time_steps, dim_space))
+  return np.concatenate((psi0[np.newaxis] / norm, sol), axis=0)
