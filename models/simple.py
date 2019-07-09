@@ -187,11 +187,32 @@ class SequentialDenseModel(base.BaseModel):
     return tf.transpose(psi, [1, 0])
 
 
-class SequentialLSTMModel(SequentialDenseModel):
+class SequentialLSTMModel(base.BaseModel):
 
-  @staticmethod
-  def _create_model(d_in, d_out):
-    add_dim = Lambda(lambda x: tf.expand_dims(x, axis=-1))
-    return tf.keras.Sequential([Input(shape=(d_in,)), add_dim,
-                                LSTM(10, return_sequences=True),
-                                LSTM(d_out)])
+  def __init__(self, init_state, time_steps,
+               rtype=tf.float32, ctype=tf.complex64):
+    self.n_sites = int(np.log2(len(init_state)))
+    self.init_state = tf.cast(init_state[np.newaxis], dtype=ctype)
+    self.time_steps = time_steps
+
+    all_confs = list(itertools.product([0, 1], repeat=self.n_sites))
+    all_confs = np.array(time_steps * [all_confs]).swapaxes(0, 1)
+    self.nn_input = tf.cast(all_confs, dtype=rtype)
+
+    self.model_norm = self._create_model()
+    self.model_phase = self._create_model()
+    self.vars = (self.model_norm.trainable_variables +
+                 self.model_phase.trainable_variables)
+
+  def _create_model(self):
+    layers = [Input(shape=(self.time_steps, self.n_sites))]
+    layers.append(LSTM(1, return_sequences=True))
+    return tf.keras.Sequential(layers)
+
+  def variational_wavefunction(self, training=False):
+    norm = self.lstm_norm(self.nn_input, training=training)[:, 0]
+    phase = self.lstm_phase = self.lstm_phase(self.nn_input,
+                                              training=training)[:, 0]
+    psi = tf.complex(norm * tf.cos(2 * np.pi * phase),
+                     norm * tf.sin(2 * np.pi * phase))
+    return tf.transpose(psi, [1, 0])

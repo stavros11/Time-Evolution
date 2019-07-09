@@ -29,11 +29,10 @@ h_init = 1.0
 h_ev = 0.5
 
 # Optimization parameters
-ctype = tf.complex64
 n_epochs = 10000
-n_message = 5
+n_message = 100
 optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
-
+ctype = tf.complex128
 
 # Find exact evolution state
 t_grid = np.linspace(0.0, t_final, time_steps + 1)
@@ -52,10 +51,10 @@ ham2 = tf.cast(ham2, dtype=ctype)
 # Define TF model
 #model = simple.RBMModel(exact_state[0], time_steps, n_hidden=8,
 #                        rtype=tf.float64, ctype=tf.complex128)
-#model = simple.MPSModel(exact_state[0], time_steps, d_bond=4,
-#                        rtype=tf.float64, ctype=tf.complex128)
-model = propagator.MPSLSTM(exact_state[0], time_steps, d_bond=4,
-                           rtype=tf.float32, ctype=tf.complex64)
+model = simple.MPSModel(exact_state[0], time_steps, d_bond=6,
+                        rtype=tf.float64, ctype=tf.complex128)
+#model = propagator.MPSLSTM(exact_state[0], time_steps, d_bond=4,
+#                           rtype=tf.float32, ctype=tf.complex64)
 #model = simple.SequentialDenseModel(exact_state[0], time_steps)
 #model = autoregressive.FullAutoregressiveModel(exact_state[0], time_steps)
 
