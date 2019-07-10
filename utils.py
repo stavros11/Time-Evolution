@@ -87,16 +87,20 @@ def ev_local(state, op):
     """Expectation value of local operator.
 
     Args:
-      state: Full state vector of shape (2**n_sites,)
+      state: Full state vector of shape (2**N,) or (M + 1, 2**N)
       op: 2x2 matrix of local operator.
     """
-    op_full = np.zeros((len(state), len(state)), dtype=op.dtype)
+    n_states = state.shape[-1]
+    op_full = np.zeros((n_states, n_states), dtype=op.dtype)
     identity = np.eye(2, dtype=op.dtype)
-    n_sites = int(np.log2(len(state)))
+    n_sites = int(np.log2(n_states))
     for site in range(n_sites):
       op_full += kron_list(site * [identity] + [op] +
                            (n_sites - 1 - site) * [identity])
-    return (np.conj(state) * op_full.dot(state)).sum() / n_sites
+    if len(state.shape) < 2:
+      return (np.conj(state) * op_full.dot(state)).sum() / n_sites
+    op_state = op_full.dot(state.T).T
+    return (np.conj(state) * op_state).sum(axis=1) / n_sites
 
 
 def tfim_hamiltonian(n_sites, h=1.0, pbc=True, dtype=np.complex128):

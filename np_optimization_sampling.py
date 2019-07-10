@@ -21,14 +21,14 @@ time_steps = 20
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
-sample_time = False
+sample_time = True
 
 # Optimization parameters
 n_epochs = 10000
 n_message = 200
 
 # Sampling parameters (per time when using the space only sampler)
-n_samples = 1000
+n_samples = 20000
 n_corr = 1
 n_burn = 10
 
@@ -42,7 +42,7 @@ exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
 
 # Initialize machine
 #machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=3)
+machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=4)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 # Initialize sampler
@@ -110,5 +110,5 @@ for k in history.keys():
 file.close()
 
 # Save final dense wavefunction
-filename = "{}.npy".format(filename[:-4])
+filename = "{}.npy".format(filename[:-5])
 np.save("final_dense/{}".format(filename), machine.dense())
