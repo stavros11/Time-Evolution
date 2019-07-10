@@ -12,7 +12,7 @@ from machines import full, mps
 
 
 n_sites = 6
-time_steps = 35
+time_steps = 100
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
@@ -45,7 +45,6 @@ for epoch in range(n_epochs):
     grad = grad.reshape((time_steps,) + machine.shape[1:])
 
   machine.update(optimizer.update(grad, epoch))
-  #machine.update(-grad  / np.sqrt((np.abs(grad)**2).mean()))
   full_psi = machine.dense()
 
   history["exact_Eloc"].append(Eloc)

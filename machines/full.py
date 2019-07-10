@@ -50,3 +50,17 @@ class FullWavefunctionMachine(base.BaseMachine):
 
   def update(self, to_add):
     self.psi[1:] += to_add
+
+
+class FullWavefunctionMachineNormalized(FullWavefunctionMachine):
+
+  def __init__(self, init_state, time_steps):
+    super().__init__(init_state, time_steps)
+    self.name = "fullwvnorm"
+    self.axes_to_sum = tuple(range(1, self.n_sites + 1))
+    self.norm_slicer = (slice(None),) + self.n_sites * (np.newaxis,)
+
+  def update(self, to_add):
+    self.psi[1:] += to_add
+    norms = (np.abs(self.psi[1:])**2).sum(axis=self.axes_to_sum)
+    self.psi[1:] *= 1.0 / np.sqrt(norms)[self.norm_slicer]
