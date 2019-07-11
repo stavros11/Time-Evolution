@@ -35,7 +35,8 @@ class SmallMPSMachine(base.BaseMachine):
       array[i, :tensors[i].shape[0], :, :tensors[i].shape[-1]] = tensors[i][:self.d_bond, :, :self.d_bond]
     return array
 
-  def _svd_split(self, m):
+  @staticmethod
+  def _svd_split(m):
     """Splits an MPS tensor in two MPS tensors.
 
     Args:
@@ -54,6 +55,36 @@ class SmallMPSMachine(base.BaseMachine):
     u = u[:, :D_middle].reshape((Dl, 2, D_middle))
     sv = s.dot(v[:D_middle]).reshape((D_middle, d // 2, Dr))
     return u, sv
+
+  def _vectorized_svd_split(self, m):
+    """Splits multiple MPS tensors simultaneously.
+
+    Args:
+      m: MPS tensors with shape (..., d, D, D)
+
+    Returns:
+      ml: Left tensor after splits with shape (..., d, D, D)
+      mr: Right tensor after split with shape (..., d, D, D)
+    """
+    batch_shape = m.shape[:-3]
+    d, Dl, Dr = m.shape[-3:]
+    assert Dl == self.d_bond
+    assert Dr == self.d_bond
+
+    u, s, v = np.linalg.svd(m.reshape(batch_shape + (d * Dl, Dr)), full_matrices=False)
+    sm = np.zeros(batch_shape + (self.d_bond, self.d_bond), dtype=m.dtype)
+    slicer = len(batch_shape) * (slice(None),)
+    sm[slicer + 2 * (range(self.d_bond),)] = s
+
+    u = u.reshape(batch_shape + (d, self.d_bond, self.d_bond))
+    v = (sm[slicer + (slice(None), slice(None), np.newaxis)] *
+         v[slicer + (np.newaxis, slice(None), slice(None))]).sum(axis=-2)
+    return u, v
+
+  def _to_canonical_form(self):
+    for i in range(self.n_sites - 1):
+      self.tensors[:, i], v = self._vectorized_svd_split(self.tensors[:, i])
+      self.tensors[:, i + 1] = np.einsum("tlm,tsmr->tslr", v, self.tensors[:, i + 1])
 
   def _calculate_dense(self):
     """Calculates the dense form of MPS.
@@ -150,4 +181,40 @@ class SmallMPSMachine(base.BaseMachine):
 
   def update(self, to_add):
     self.tensors[1:] += to_add
+    self._dense = self._create_envs()
+
+
+class SmallMPSMachineNorm(SmallMPSMachine):
+
+  def __init__(self, init_state, time_steps, d_bond, d_phys=2):
+    super().__init__(init_state, time_steps, d_bond, d_phys=2)
+    self.name = "mpsD{}norm".format(d_bond)
+    self.axes_to_sum = tuple(range(1, self.n_sites + 1))
+    self.norm_slicer = (slice(None),) + len(self.tensors.shape[1:]) * (np.newaxis,)
+
+    norms = np.sqrt((np.abs(self._dense)**2).sum(axis=self.axes_to_sum))
+    self.tensors *= 1.0 / (norms[self.norm_slicer])**(1 / self.n_sites)
+
+  def update(self, to_add):
+    self.tensors[1:] += to_add
+    temp_dense = self._create_envs()
+    norms = np.sqrt((np.abs(temp_dense[1:])**2).sum(axis=self.axes_to_sum))
+
+    self.tensors[1:] *= 1.0 / (norms[self.norm_slicer])**(1 / self.n_sites)
+    self._dense = self._create_envs()
+
+
+class SmallMPSMachineCanonical(SmallMPSMachine):
+
+  def __init__(self, init_state, time_steps, d_bond, d_phys=2):
+    super().__init__(init_state, time_steps, d_bond, d_phys=2)
+    self.name = "mpsD{}canonical".format(d_bond)
+    self.canonical_mask = (self.tensors != 0.0).astype(self.dtype)
+    self._to_canonical_form()
+    self._dense = self._create_envs()
+
+  def update(self, to_add):
+    self.tensors[1:] += to_add
+    self.tensors *= self.canonical_mask
+    self._to_canonical_form()
     self._dense = self._create_envs()
