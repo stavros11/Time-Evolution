@@ -177,6 +177,26 @@ def tfim_exact_evolution(n_sites, t_final, time_steps, h0=1.0, h=0.5,
   return np.array(state), observables
 
 
+def tfim_trotterized_evolution(u_list, psi0, time_steps):
+  """Trotterized evolution of full wavefunction.
+
+  Args:
+    u_list: List of unitary operators for one step time propagation.
+    psi0: Initial condition with shape (2**N,).
+    time_steps: Number of times to apply the evolution unitary.
+
+  Returns:
+    state: Evolved state.
+  """
+  state = [np.copy(psi0)]
+  for i in range(time_steps):
+    state_temp = np.copy(state[-1])
+    for u in u_list:
+      state_temp = u.dot(state_temp)
+    state.append(np.copy(state_temp))
+  return np.array(state)
+
+
 class AdamComplex():
   """Adam optimizer for complex variable."""
 
