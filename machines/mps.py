@@ -190,18 +190,17 @@ class SmallMPSMachineNorm(SmallMPSMachine):
     super().__init__(init_state, time_steps, d_bond, d_phys=2)
     self.name = "mpsD{}norm".format(d_bond)
     self.axes_to_sum = tuple(range(1, self.n_sites + 1))
-    self.norm_slicer = (slice(None),) + len(self.tensors.shape[1:]) * (np.newaxis,)
+    tensor_slicer = (slice(None),) + len(self.tensors.shape[1:]) * (np.newaxis,)
+    self.dense_slicer = (slice(None),) + self.n_sites * (np.newaxis,)
 
     norms = np.sqrt((np.abs(self._dense)**2).sum(axis=self.axes_to_sum))
-    self.tensors *= 1.0 / (norms[self.norm_slicer])**(1 / self.n_sites)
+    self.tensors *= 1.0 / (norms[tensor_slicer])**(1 / self.n_sites)
 
   def update(self, to_add):
     self.tensors[1:] += to_add
-    temp_dense = self._create_envs()
-    norms = np.sqrt((np.abs(temp_dense[1:])**2).sum(axis=self.axes_to_sum))
-
-    self.tensors[1:] *= 1.0 / (norms[self.norm_slicer])**(1 / self.n_sites)
     self._dense = self._create_envs()
+    norms = np.sqrt((np.abs(self._dense)**2).sum(axis=self.axes_to_sum))
+    self._dense *= 1.0 / norms[self.dense_slicer]
 
 
 class SmallMPSMachineCanonical(SmallMPSMachine):
