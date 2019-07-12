@@ -88,15 +88,18 @@ class TFIMTrotterMPS:
 
   def _construct_zz_op(self, dt):
     assert self.n_sites % 2 == 0
-    white = np.array([[1, 0, 0, 1], [1, 0, 0, -1]], dtype=self.dtype).T
-    cos, sin = np.cos(dt), np.sin(dt)
-    black = np.array([[cos, 0, 0, cos], [1j * sin, 0, 0, 1j * sin]],
-                     dtype=self.dtype)
-    white = white.reshape((2, 2, 2))
-    black = black.reshape((2, 2, 2))
+    exp = np.exp(1j * dt)
+    u12 = np.diag([exp, exp.conj(), exp.conj(), exp]).astype(self.dtype)
+    u12 = u12.reshape(4 * (2,)).transpose([0, 2, 1, 3])
 
-    even = np.einsum("lum,mdr->ludr", white, black)
-    odd = np.einsum("lmd,umr->ludr", black, white)
+    u, s, v = np.linalg.svd(u12.reshape((4, 4)))
+    v = np.diag(s[:2]).dot(v[:2])
+
+    u = u[:, :2].reshape((2, 2, 2)) # (d, d, D)
+    v = v.reshape((2, 2, 2)) # (D, d, d)
+
+    even = np.einsum("lum,mdr->ludr", v, u)
+    odd = np.einsum("umr,lmd->ludr", u, v)
     return np.stack((self.n_sites // 2) * [even, odd])
 
   def evolution_step(self, mps0):
@@ -107,7 +110,7 @@ class TFIMTrotterMPS:
   def evolve(self, time_steps):
     for i in range(time_steps):
       self.tensors.append(self.evolution_step(self.tensors[-1]))
-    return self.tensors
+    return np.array(self.tensors)
 
   def dense_evolution(self, time_steps):
     if len(self.tensors) == 1:
