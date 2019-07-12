@@ -2,6 +2,7 @@
 
 import numpy as np
 from machines import base
+from machines import mps_utils
 
 
 class SmallMPSMachine(base.BaseMachine):
@@ -14,47 +15,13 @@ class SmallMPSMachine(base.BaseMachine):
     self.d_bond, self.d_phys = d_bond, d_phys
     self.name = "mpsD{}".format(d_bond)
 
-    tensors = np.array((time_steps + 1) * [self._dense_to_mps(init_state)])
+    tensors = np.array((time_steps + 1) * [mps_utils.dense_to_mps(init_state)])
     self.tensors = tensors.transpose([0, 1, 3, 2, 4])
     self.dtype = self.tensors.dtype
     self.shape = self.tensors[1:].shape
 
     self._dense = self._create_envs()
     self.bin_to_dec = 2**np.arange(self.n_sites)
-
-  def _dense_to_mps(self, state):
-    """Transforms a dense wavefunction to an approximate MPS form."""
-    tensors = [state[np.newaxis, :, np.newaxis]]
-    while len(tensors) < self.n_sites:
-      tensors[-1], temp = self._svd_split(tensors[-1])
-      tensors.append(temp)
-
-    array = np.zeros([self.n_sites, self.d_bond, self.d_phys, self.d_bond],
-                     dtype=state.dtype)
-    for i in range(self.n_sites):
-      array[i, :tensors[i].shape[0], :, :tensors[i].shape[-1]] = tensors[i][:self.d_bond, :, :self.d_bond]
-    return array
-
-  @staticmethod
-  def _svd_split(m):
-    """Splits an MPS tensor in two MPS tensors.
-
-    Args:
-      m: MPS tensor with shape (Dl, d, Dr)
-
-    Returns:
-      ml: Left tensor after split with shape (Dl, d', Dm)
-      mr: Right tensor after split with shape (Dm, d', Dr)
-      with d' = sqrt(d) and Dm = d' min(Dl, Dr)
-    """
-    Dl, d, Dr = m.shape
-    u, s, v = np.linalg.svd(m.reshape(Dl * 2, Dr * d // 2))
-    D_middle = min(u.shape[-1], v.shape[0])
-    s = np.diag(s[:D_middle])
-
-    u = u[:, :D_middle].reshape((Dl, 2, D_middle))
-    sv = s.dot(v[:D_middle]).reshape((D_middle, d // 2, Dr))
-    return u, sv
 
   def _vectorized_svd_split(self, m):
     """Splits multiple MPS tensors simultaneously.
