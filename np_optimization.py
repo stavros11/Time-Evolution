@@ -67,5 +67,5 @@ for k in history.keys():
 file.close()
 
 # Save final dense wavefunction
-filename = "{}.npy".format(filename[:-4])
+filename = "{}.npy".format(filename[:-5])
 np.save("final_dense/{}".format(filename), full_psi)
