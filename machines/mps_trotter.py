@@ -1,4 +1,4 @@
-"""Evolution using the MPO form of the Trotterized evolution operator."""
+"""Evolution of MPS using the Trotterized evolution operator."""
 
 import numpy as np
 import scipy
