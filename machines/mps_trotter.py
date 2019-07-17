@@ -60,7 +60,7 @@ def apply_two_qubit_product(ops, mps, even=True):
   if even:
     mps = (mps[::2], mps[1::2])
   else:
-    mps = (mps[1::2], np.stack((mps[2::2], mps[0][np.newaxis])))
+    mps = (mps[1::2], np.concatenate((mps[2::2], mps[0][np.newaxis]), axis=0))
 
   return np.einsum("iabcd,iclm,idmr->iablr", ops, mps[0], mps[1])
 
@@ -139,7 +139,7 @@ def split_double_mps(dmps, even=True):
   # Reshape dmps to matrix for SVD
   half_sites, d_phys, _, d_bond, _ = dmps.shape
   mat_d = d_phys * d_bond
-  mat = dmps.swapaxes((2, 3)).reshape((half_sites, mat_d, mat_d))
+  mat = dmps.swapaxes(2, 3).reshape((half_sites, mat_d, mat_d))
   # SVD
   u, s, v = np.linalg.svd(mat)
   # Truncate middle SVD dimension to D instead of d*D and reshape
@@ -147,7 +147,7 @@ def split_double_mps(dmps, even=True):
   # Combine S and V
   ident = np.eye(d_bond, dtype=dtype)
   v = np.einsum("im,lm,imr->ilr", s[:, :d_bond], ident, v[:, :d_bond])
-  v = v.reshape((half_sites, d_bond, d_phys, d_bond)).swapaxes((1, 2))
+  v = v.reshape((half_sites, d_bond, d_phys, d_bond)).swapaxes(1, 2)
 
   # Construct MPS
   mps = np.zeros((2 * half_sites, d_phys, d_bond, d_bond), dtype=dtype)
@@ -219,15 +219,19 @@ class TFIM_TEBD(EvolutionMBase):
     super().__init__(psi0, d_bond)
     pauli = utils.Pauli(self.dtype)
     ham12 = -np.kron(pauli.Z, pauli.Z)
-    ham12 += -h * (np.kron(pauli.I, pauli.X) + np.kron(pauli.X, pauli.I))
-    u12_even = scipy.linalg.expm(-1j * dt * ham12 / 2.0)
-    u12_odd = scipy.linalg.expm(-1j * dt * ham12)
-    self.ops_even = np.stack(
-        (self.n_sites // 2) * [u12_even[np.newaxis]], axis=0)
-    self.ops_odd = np.stack(
-        (self.n_sites // 2) * [u12_odd[np.newaxis]], axis=0)
+    ham12 += -h * np.kron(pauli.X, pauli.I)
 
-  def evolve_and_split(self, mps, even=True):
+    exp = -1j * dt * ham12
+    self.ops_even = self._construct_two_qubit_ops(exp / 2.0, self.n_sites)
+    self.ops_odd = self._construct_two_qubit_ops(exp, self.n_sites)
+
+  @staticmethod
+  def _construct_two_qubit_ops(exponent, n_sites):
+    u = scipy.linalg.expm(exponent)
+    u = u.reshape(4 * (2,))
+    return np.stack((n_sites // 2) * [u], axis=0)
+
+  def _evolve_and_split(self, mps, even=True):
     ops = [self.ops_odd, self.ops_even][even]
     dmps = apply_two_qubit_product(ops, mps, even=even)
     return split_double_mps(dmps, even=even)
@@ -235,5 +239,5 @@ class TFIM_TEBD(EvolutionMBase):
   def evolution_step(self, mps0):
     mps = np.copy(mps0)
     for e in [True, False, True]:
-      mps = self.evolve_and_split(mps, even=e)
+      mps = self._evolve_and_split(mps, even=e)
     return mps
