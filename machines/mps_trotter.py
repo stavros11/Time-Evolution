@@ -39,32 +39,6 @@ def apply_mpo(op, mps):
   return res.reshape(shape)
 
 
-def split_two_qubit_gate(u12, n_sites, d_bond):
-  """"Splits a two qubit gate to an MPO for n_sites.
-
-  Args:
-    u12: The two qubit gate as a (4, 4) array.
-    n_sites: Number of sites for the MPO construction.
-    d_bond: Bond dimension D of the MPO.
-
-  Returns:
-    The MPO that is equivalent to applying the two qubit gate to all nn
-    pairs of the given sites as a (N, D, d, d, D) array.
-  """
-  assert n_sites % 2 == 0
-  u12 = u12.reshape(4 * (2,)).transpose([0, 2, 1, 3])
-
-  u, s, v = np.linalg.svd(u12.reshape((4, 4)))
-  v = np.diag(s[:d_bond]).dot(v[:d_bond])
-
-  u = u[:, :d_bond].reshape((2, 2, d_bond)) # (d, d, D)
-  v = v.reshape((d_bond, 2, 2)) # (D, d, d)
-
-  even = np.einsum("lum,mdr->ludr", v, u)
-  odd = np.einsum("umr,lmd->ludr", u, v)
-  return np.stack((n_sites // 2) * [even, odd])
-
-
 def apply_two_qubit_product(ops, mps, even=True):
   """Applies a product of two qubit operations to an MPS.
 
@@ -120,6 +94,32 @@ def truncate_bond_dimension(mps, d_bond):
   return np.concatenate((boundary[np.newaxis], new), axis=0)
 
 
+def split_two_qubit_gate(u12, n_sites, d_bond):
+  """"Splits a two qubit gate to an MPO for n_sites.
+
+  Args:
+    u12: The two qubit gate as a (4, 4) array.
+    n_sites: Number of sites for the MPO construction.
+    d_bond: Bond dimension D of the MPO.
+
+  Returns:
+    The MPO that is equivalent to applying the two qubit gate to all nn
+    pairs of the given sites as a (N, D, d, d, D) array.
+  """
+  assert n_sites % 2 == 0
+  u12 = u12.reshape(4 * (2,)).transpose([0, 2, 1, 3])
+
+  u, s, v = np.linalg.svd(u12.reshape((4, 4)))
+  v = np.diag(s[:d_bond]).dot(v[:d_bond])
+
+  u = u[:, :d_bond].reshape((2, 2, d_bond)) # (d, d, D)
+  v = v.reshape((d_bond, 2, 2)) # (D, d, d)
+
+  even = np.einsum("lum,mdr->ludr", v, u)
+  odd = np.einsum("umr,lmd->ludr", u, v)
+  return np.stack((n_sites // 2) * [even, odd])
+
+
 def split_double_mps(dmps, even=True):
   """Splits a pairwise contracted MPS to a normal MPS using SVD.
 
@@ -162,8 +162,7 @@ def split_double_mps(dmps, even=True):
   return mps
 
 
-
-class TFIMBase:
+class EvolutionMBase:
 
   def __init__(self, psi0, d_bond):
     self.dtype = psi0.dtype
@@ -189,7 +188,8 @@ class TFIMBase:
     return mps_utils.mps_to_dense(self.tensors.swapaxes(0, 1))
 
 
-class TFIMTrotter(TFIMBase):
+class TFIMTrotter(EvolutionMBase):
+  """A self-made approach for MPS evolution of TFIM using MPOs."""
 
   def __init__(self, psi0, d_bond, dt, h=1.0):
     super().__init__(psi0, d_bond)
@@ -212,16 +212,28 @@ class TFIMTrotter(TFIMBase):
     return apply_prodop(self.x_op, zz_trunc)
 
 
-class TFIMFull(TFIMBase):
+class TFIM_TEBD(EvolutionMBase):
+  """Standard TEBD evolution for TFIM."""
 
   def __init__(self, psi0, d_bond, dt, h=1.0):
     super().__init__(psi0, d_bond)
     pauli = utils.Pauli(self.dtype)
     ham12 = -np.kron(pauli.Z, pauli.Z)
     ham12 += -h * (np.kron(pauli.I, pauli.X) + np.kron(pauli.X, pauli.I))
-    u12 = scipy.linalg.expm(-1j * dt * ham12)
-    self.op = split_two_qubit_gate(u12, self.n_sites, d_bond=4)
+    u12_even = scipy.linalg.expm(-1j * dt * ham12 / 2.0)
+    u12_odd = scipy.linalg.expm(-1j * dt * ham12)
+    self.ops_even = np.stack(
+        (self.n_sites // 2) * [u12_even[np.newaxis]], axis=0)
+    self.ops_odd = np.stack(
+        (self.n_sites // 2) * [u12_odd[np.newaxis]], axis=0)
+
+  def evolve_and_split(self, mps, even=True):
+    ops = [self.ops_odd, self.ops_even][even]
+    dmps = apply_two_qubit_product(ops, mps, even=even)
+    return split_double_mps(dmps, even=even)
 
   def evolution_step(self, mps0):
-    evolved = apply_mpo(self.op, mps0)
-    return truncate_bond_dimension(evolved, self.d_bond)
+    mps = np.copy(mps0)
+    for e in [True, False, True]:
+      mps = self.evolve_and_split(mps, even=e)
+    return mps
