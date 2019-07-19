@@ -20,3 +20,12 @@ Notebooks are mostly used for visualization and plotting results.
 * `plotter.ipynb`: Plot the results of variational optimization. Example of plots include training dynamics of the cost function (`Eloc`) as well as the overlap with the exact evolution solution.
 
 * `plot_observables.ipynb`: Plot observables (typically `sigma_x`) and compare with their exact evolution.
+
+
+### Main scripts
+
+* `np_optimization.py`: Optimizes a `machine` using gradient descent (variational optimization). Expectation values for quantities and gradients are calculated exactly by summing over all bitstrings (this is tractable only for small systems).
+
+* `np_optimization_sampling.py`: Optimizes a `machine` using gradient descent (variational optimization). Expectation values for quantities and gradients are calculated using Monte Carlo sampling. Different samplers are used (sample time vs force a uniform distribution in time).
+
+* `tf_optimization.py`: Optimizes a `model` using gradient descent (variational optimization) where quantities are calculated exactly. Note that a `model` is written in TensorFlow, while `machine` uses pure NumPy. TensorFlow allows us to try various models (particularly based on NNs) without the need to hard-code the gradients.
