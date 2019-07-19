@@ -29,3 +29,7 @@ Notebooks are mostly used for visualization and plotting results.
 * `np_optimization_sampling.py`: Optimizes a `machine` using gradient descent (variational optimization). Expectation values for quantities and gradients are calculated using Monte Carlo sampling. Different samplers are used (sample time vs force a uniform distribution in time).
 
 * `tf_optimization.py`: Optimizes a `model` using gradient descent (variational optimization) where quantities are calculated exactly. Note that a `model` is written in TensorFlow, while `machine` uses pure NumPy. TensorFlow allows us to try various models (particularly based on NNs) without the need to hard-code the gradients.
+
+* `sampler_convergence.py`: Tests the C++ samplers by calculating the various terms in `Eloc` of the Clock Hamiltonian and check whether they converge as the number of samples is increased.
+
+* `rbm_ground_state.py`: Finds ground state of a Hamiltonian using an RBM ansatz. This is in order to initialize an RBM machine for time evolution, as (unlike MPS) it is not trivial how to go from dense wavefunction to RBM.
