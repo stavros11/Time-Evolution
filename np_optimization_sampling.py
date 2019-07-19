@@ -42,7 +42,7 @@ exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
 
 # Initialize machine
 #machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=4)
+machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=5)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 # Initialize sampler

@@ -29,7 +29,7 @@ exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
 
 # Initialize machine
 #machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine = mps.SmallMPSMachineNorm(exact_state[0], time_steps, d_bond=4)
+machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=5)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 history = {"overlaps" : [], "avg_overlaps": [], "exact_Eloc": []}
@@ -47,8 +47,8 @@ for epoch in range(n_epochs):
   machine.update(optimizer.update(grad, epoch))
   full_psi = machine.dense()
 
-  if epoch % 50 == 0:
-    print((np.abs(full_psi)**2).sum(axis=1))
+  #if epoch % 50 == 0:
+  #  print((np.abs(full_psi)**2).sum(axis=1))
 
   history["exact_Eloc"].append(Eloc)
   history["overlaps"].append(utils.overlap(full_psi, exact_state))

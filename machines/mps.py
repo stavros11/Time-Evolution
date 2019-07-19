@@ -15,7 +15,8 @@ class SmallMPSMachine(base.BaseMachine):
     self.d_bond, self.d_phys = d_bond, d_phys
     self.name = "mpsD{}".format(d_bond)
 
-    tensors = np.array((time_steps + 1) * [mps_utils.dense_to_mps(init_state)])
+    tensors = np.array((time_steps + 1) *
+                       [mps_utils.dense_to_mps(init_state, d_bond)])
     self.tensors = tensors.transpose([0, 1, 3, 2, 4])
     self.dtype = self.tensors.dtype
     self.shape = self.tensors[1:].shape
