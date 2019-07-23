@@ -8,7 +8,7 @@ from models import base
 from tensorflow.keras.layers import Input, LSTM, Dense, Lambda
 
 
-class FullStateModel(base.BaseModel):
+class FullStateModelAutograd(base.BaseModel):
   """Variational parameters are the full wavefunction as each time step."""
 
   def __init__(self, init_state, time_steps, std=1e-3,
@@ -19,14 +19,33 @@ class FullStateModel(base.BaseModel):
     self.real = tf.Variable(state.real, dtype=rtype, trainable=True)
     self.imag = tf.Variable(state.imag, dtype=rtype, trainable=True)
 
-  def update(self, optimizer, updater):
-    complex_grads = updater(self.wavefunction())
+    self.vars = [self.real, self.imag]
+
+  def variational_wavefunction(self, training=False):
+    return tf.complex(self.real, self.imag)
+
+
+class FullStateModel(FullStateModelAutograd):
+  """Same as above but with hard-coded gradients."""
+
+  def update(self, optimizer, updater, normalize=False):
+    """Updates the state using hard-coded gradients.
+
+    Args:
+      optimizer: TensorFlow optimizer object to be used for the update.
+      updater: Function that returns (complex_gradients, Eloc) tuple.
+    """
+    complex_grads, Eloc = updater(self.wavefunction())
     grads = [tf.real(complex_grads), tf.imag(complex_grads)]
     variables = [self.real, self.imag]
     optimizer.apply_gradients(zip(grads, variables))
 
-  def variational_wavefunction(self, training=False):
-    return tf.complex(self.real, self.imag)
+    if normalize:
+      norm = tf.sqrt(tf.reduce_sum(
+          tf.square(tf.abs(self.variational_wavefunction())), axis=1))
+      self.real.assign(self.real / norm[:, tf.newaxis])
+      self.imag.assign(self.imag / norm[:, tf.newaxis])
+    return Eloc
 
 
 class MPSModel(base.BaseModel):
@@ -182,37 +201,6 @@ class SequentialDenseModel(base.BaseModel):
   def variational_wavefunction(self, training=False):
     norm = self.model_norm(self.all_confs, training=training)
     phase = self.model_phase(self.all_confs, training=training)
-    psi = tf.complex(norm * tf.cos(2 * np.pi * phase),
-                     norm * tf.sin(2 * np.pi * phase))
-    return tf.transpose(psi, [1, 0])
-
-
-class SequentialLSTMModel(base.BaseModel):
-
-  def __init__(self, init_state, time_steps,
-               rtype=tf.float32, ctype=tf.complex64):
-    self.n_sites = int(np.log2(len(init_state)))
-    self.init_state = tf.cast(init_state[np.newaxis], dtype=ctype)
-    self.time_steps = time_steps
-
-    all_confs = list(itertools.product([0, 1], repeat=self.n_sites))
-    all_confs = np.array(time_steps * [all_confs]).swapaxes(0, 1)
-    self.nn_input = tf.cast(all_confs, dtype=rtype)
-
-    self.model_norm = self._create_model()
-    self.model_phase = self._create_model()
-    self.vars = (self.model_norm.trainable_variables +
-                 self.model_phase.trainable_variables)
-
-  def _create_model(self):
-    layers = [Input(shape=(self.time_steps, self.n_sites))]
-    layers.append(LSTM(1, return_sequences=True))
-    return tf.keras.Sequential(layers)
-
-  def variational_wavefunction(self, training=False):
-    norm = self.lstm_norm(self.nn_input, training=training)[:, 0]
-    phase = self.lstm_phase = self.lstm_phase(self.nn_input,
-                                              training=training)[:, 0]
     psi = tf.complex(norm * tf.cos(2 * np.pi * phase),
                      norm * tf.sin(2 * np.pi * phase))
     return tf.transpose(psi, [1, 0])
