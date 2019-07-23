@@ -17,12 +17,12 @@ import tensorflow as tf
 import utils
 from energy import full_tf
 from models import simple
-from models import propagator
+from models import autoregressive
 tf.enable_v2_behavior()
 
 
 # System parameters
-n_sites = 4
+n_sites = 6
 time_steps = 20
 t_final = 1.0
 h_init = 1.0
@@ -32,7 +32,7 @@ h_ev = 0.5
 n_epochs = 10000
 n_message = 100
 optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
-ctype = tf.complex128
+ctype = tf.complex64
 
 # Find exact evolution state
 t_grid = np.linspace(0.0, t_final, time_steps + 1)
@@ -51,12 +51,11 @@ ham2 = tf.cast(ham2, dtype=ctype)
 # Define TF model
 #model = simple.RBMModel(exact_state[0], time_steps, n_hidden=8,
 #                        rtype=tf.float64, ctype=tf.complex128)
-model = simple.MPSModel(exact_state[0], time_steps, d_bond=6,
-                        rtype=tf.float64, ctype=tf.complex128)
+#model = simple.FullStateModel(exact_state[0], time_steps,
+#                              rtype=tf.float64, ctype=tf.complex128)
 #model = propagator.MPSLSTM(exact_state[0], time_steps, d_bond=4,
 #                           rtype=tf.float32, ctype=tf.complex64)
-#model = simple.SequentialDenseModel(exact_state[0], time_steps)
-#model = autoregressive.FullAutoregressiveModel(exact_state[0], time_steps)
+model = autoregressive.FullAutoregressiveModel(exact_state[0], time_steps)
 
 
 # Define loss function for autograd or hardcoded complex gradients
@@ -65,10 +64,11 @@ model = simple.MPSModel(exact_state[0], time_steps, d_bond=6,
 # Case 1: updater is a function that returns Eloc and auto diff is used.
 updater = lambda psi: tf.real(full_tf.all_states_Eloc(psi, ham, dt, Ham2=ham2))
 
-# Case 2: updater is a function that returns the complex gradients
+# Case 2: updater is a function that returns the complex gradients and Eloc
+# Eloc has to be returned in order to be logged in history["exact_Eloc"]
 #def updater(full_psi, dt=dt):
 #  Ok, Ok_star_Eloc, Eloc = full_tf.all_states_gradient(full_psi, ham, dt, Ham2=ham2)
-#  return Ok_star_Eloc - tf.conj(Ok) * Eloc
+#  return Ok_star_Eloc - tf.conj(Ok) * Eloc, Eloc
 
 
 # Optimize
