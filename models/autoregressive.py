@@ -54,25 +54,26 @@ class MaskedAffineLayer(tf.keras.layers.Layer):
 class FullAutoregressiveModel(base.BaseModel):
   """Independent weights used for each time step."""
 
-  def __init__(self, init_state, time_steps,
+  def __init__(self, init_state, time_steps, std=1e-3,
                rtype=tf.float32, ctype=tf.complex64):
     n_sites = int(np.log2(len(init_state)))
     self.init_state = tf.cast(init_state[np.newaxis], dtype=ctype)
 
-
     all_confs = np.array(list(itertools.product([0, 1], repeat=n_sites)))
-    self.all_confs_oh = self._convert_to_onehot(all_confs[np.newaxis], rtype)
-
-    inputs = np.concatenate(
-        [np.ones([len(all_confs), 1], dtype=all_confs.dtype),
-         all_confs[:, 1:]], axis=1)
+    self.all_confs_oh = self._convert_to_onehot(all_confs, rtype)
+    inputs = np.concatenate([np.ones((len(all_confs), 1)),
+                             all_confs[:, :-1]], axis=1)
     self.inputs = tf.cast(inputs, dtype=rtype)
 
-    self.norm_nn = self._create_model(n_sites, time_steps)
-    self.phase_nn = self._create_model(n_sites, time_steps)
+    w_shapes = [(n_sites, 20), (20, 60), (60, n_sites * time_steps * 2)]
 
-    self.vars = (self.norm_nn.trainable_variables +
-                 self.phase_nn.trainable_variables)
+    self.w_norm = [tf.Variable(np.random.normal(0, std, size=s), dtype=rtype)
+                   for s in w_shapes]
+    self.w_phase = [tf.Variable(np.random.normal(0, std, size=s), dtype=rtype)
+                    for s in w_shapes]
+    self.masks = [tf.cast(np.triu(np.ones(s)), rtype) for s in w_shapes]
+
+    self.vars = [self.w_norm, self.w_phase]
 
   @staticmethod
   def _convert_to_onehot(all_confs, dtype=tf.float32):
@@ -83,26 +84,29 @@ class FullAutoregressiveModel(base.BaseModel):
     return tf.cast(one_hot.reshape(shape + (2,)), dtype=dtype)
 
   @staticmethod
-  def _create_model(n_sites, time_steps, d_spin=2):
-    n_hidden = n_sites * time_steps
-    transpose_layer = Lambda(lambda x: tf.transpose(x, [2, 0, 1, 3]))
-    return tf.keras.Sequential([Input((n_sites,)),
-                                MaskedAffineLayer(n_hidden, n_sites),
-                                Activation("relu"),
-                                MaskedAffineLayer(n_hidden * d_spin, n_hidden),
-                                Activation("sigmoid"),
-                                Reshape((n_sites, time_steps, 2)),
-                                transpose_layer])
+  def masked_affine(w, x, mask):
+    return tf.matmul(x, mask * w)
 
   def variational_wavefunction(self, training=False):
-    norms = self.norm_nn(self.inputs, training=training)
-    phases = self.phase_nn(self.inputs, training=training)
+    norms = tf.cast(self.inputs, dtype=self.inputs.dtype)
+    phases = tf.cast(self.inputs, dtype=self.inputs.dtype)
+    for i in range(len(self.masks) - 1):
+      norms = tf.nn.relu(
+          self.masked_affine(self.w_norm[i], norms, self.masks[i]))
+      phases = tf.nn.relu(
+          self.masked_affine(self.w_phase[i], norms, self.masks[i]))
+    norms = tf.sigmoid(
+        self.masked_affine(self.w_norm[-1], norms, self.masks[-1]))
+    phases = tf.sigmoid(
+        self.masked_affine(self.w_phase[-1], norms, self.masks[-1]))
 
-    norms_i = tf.reduce_sum(norms * self.all_confs_oh, axis=-1)
-    normalization_i = tf.reduce_sum(tf.square(norms), axis=-1)
+    output_shape = (len(self.inputs), self.time_steps, self.n_sites, 2)
+    norms = tf.reshape(norms, output_shape)
+    phases = tf.reshape(phases, output_shape)
 
-    logpsi_re = tf.reduce_sum(tf.log(norms_i) - 0.5 * tf.log(normalization_i),
-                              axis=-1)
-    logpsi_im = 2 * np.pi * tf.reduce_sum(phases * self.all_confs_oh,
-                                          axis=(-2, -1))
-    return tf.exp(tf.complex(logpsi_re, logpsi_im))
+    norms_i = np.einsum("btis,bis->tbi", norms, self.all_confs_oh)
+    normalization_i = tf.reduce_sum(tf.exp(2 * norms), axis=-1)
+    phases = 2 * np.pi * np.einsum("btis,bis->tb", phases, self.all_confs_oh)
+
+    logpsi_re = tf.reduce_sum(norms_i - 0.5 * tf.log(normalization_i), axis=-1)
+    return tf.exp(tf.complex(logpsi_re, phases))

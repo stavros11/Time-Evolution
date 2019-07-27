@@ -31,7 +31,7 @@ h_ev = 0.5
 # Optimization parameters
 n_epochs = 10000
 n_message = 100
-optimizer = tf.train.AdamOptimizer(learning_rate=1e-3)
+optimizer = tf.train.AdamOptimizer(learning_rate=1e-1)
 ctype = tf.complex64
 
 # Find exact evolution state
@@ -76,7 +76,10 @@ history = {"overlaps": [], "exact_Eloc": []}
 for epoch in range(n_epochs):
   history["exact_Eloc"].append(model.update(optimizer, updater))
   history["overlaps"].append(model.overlap(exact_state_tf, normalize_states=True).numpy())
+
   if epoch % n_message == 0:
+    psi = model.variational_wavefunction().numpy()
+    print((np.abs(psi)**2).sum(axis=1))
     print("\nEpoch: {}".format(epoch))
     print("Overlap: {}".format(history["overlaps"][-1]))
     print("Exact Eloc: {}".format(history["exact_Eloc"][-1]))
