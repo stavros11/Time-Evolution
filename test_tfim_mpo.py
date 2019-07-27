@@ -3,14 +3,14 @@
 import utils
 from machines import mps_utils
 
-n_sites = 8
+n_sites = 7
 h = 1.0
 
 ham = utils.tfim_hamiltonian(n_sites, h)
 mpo = utils.tfim_mpo(n_sites, h)
 print(mpo.shape)
 
-dense = mps_utils.mpo_to_dense(mpo, trace=False)
+dense = mps_utils.mpo_to_dense(mpo, trace=True)
 print(dense.shape)
 
 print()

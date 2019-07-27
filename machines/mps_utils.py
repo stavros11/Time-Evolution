@@ -23,17 +23,11 @@ def mps_to_dense(mps):
   return np.trace(dense, axis1=-2, axis2=-1)
 
 
-def mpo_to_dense(mpo, trace=True):
+def mpo_to_dense(mpo):
   """Transforms a MPO to a dense unitary operator.
 
   Args:
     mpo: Array of MPO tensors with shape (N, ..., D, d, d, D).
-    trace: If True, it finishes the calculation by taking the trace,
-      that is contracting the two dangling legs.
-      If False, it sums all the elements of the final matrix. This is used
-      when the first and last sites are vectors but are passed as diagonal
-      matrices. In this case the sum over all elements is equivalent to the
-      actual contraction.
 
   Returns:
     Dense operator with shape (..., d**N, d**N)
@@ -48,10 +42,7 @@ def mpo_to_dense(mpo, trace=True):
   for m in mpo[2:]:
     dense = reshape(np.einsum("lUDm,mudr->lUuDdr", dense, m))
 
-  if trace:
-    return np.trace(dense, axis1=-4, axis2=-1)
-  else:
-    return dense.sum(axis=(-4, -1))
+  return np.trace(dense, axis1=-4, axis2=-1)
 
 
 def dense_to_mps(state, d_bond, d_phys=2):

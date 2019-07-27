@@ -152,11 +152,11 @@ def tfim_mpo(n_sites, h=1.0, dtype=np.complex128):
 
   left_vector = np.zeros([5, 2, 2, 5], dtype=dtype)
   for i, p in enumerate([pauli.Z, h * pauli.X, pauli.I]):
-    left_vector[i, :, :, i] = np.copy(p)
+    left_vector[0, :, :, i] = np.copy(p)
 
   right_vector = np.zeros([5, 2, 2, 5], dtype=dtype)
   for i, p in enumerate([-pauli.I, -h * pauli.X, -pauli.Z]):
-    right_vector[i, :, :, i] = np.copy(p)
+    right_vector[i, :, :, 0] = np.copy(p)
 
 
   left_matrix = np.zeros([5, 2, 2, 5], dtype=dtype)
