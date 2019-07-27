@@ -68,7 +68,7 @@ def mps_overlap(mps1, mps2):
   return tf.linalg.trace(prod)
 
 
-def clock_energy(mps, ham, dt, ham2=None):
+def clock_energy(mps, ham, dt):
   """Calculates clock EV <Psi|C|Psi> for a given MPS.
 
   Note that if |Psi> is not normalized we have to divide with <Psi|Psi>.
@@ -79,7 +79,6 @@ def clock_energy(mps, ham, dt, ham2=None):
     mps: MPS tensors with shape (T+1, N, d, D, D).
     ham: MPO representation of the Hamiltonian with shape (N, Do, d, d, Do).
     dt: (float) Size of time step.
-    ham2: MPO representation of H^2 with shape (N, Doo, d, d, Doo).
 
   Returns:
     clock: <C> = <Psi|C|Psi> as a scalar.
@@ -87,10 +86,6 @@ def clock_energy(mps, ham, dt, ham2=None):
     norms: Norm <psi|psi> at each time step with shape (T,).
       Note that the Clock-space norm <Psi|Psi> is sum(norms).
   """
-  if ham2 is None:
-    # Should implement MPO multiplication in tf.
-    raise NotImplementedError
-
   norms = mps_overlap(mps, mps)
   t1_t = mps_overlap(mps[1:], mps[:-1])
 
@@ -98,10 +93,8 @@ def clock_energy(mps, ham, dt, ham2=None):
   term0 += norms[-1] - norms[0]
 
   ham_mps = apply_mpo(ham, mps)
-  ham2_mps = apply_mpo(ham2, mps)
-
   energy = mps_overlap(mps, ham_mps)
-  energy2 = mps_overlap(mps, ham2_mps)
+  energy2 = mps_overlap(ham_mps, ham_mps)
 
   t1_ham_t = mps_overlap(mps[1:], ham_mps[:-1])
   term1 = tf.reduce_sum(t1_ham_t - tf.conj(t1_ham_t))
