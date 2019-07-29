@@ -92,3 +92,35 @@ def sampling_tvmc_step(machine, configs, h=0.5):
 
   rhs, info = linalg.gmres(Skk, Fk)
   return rhs, Ok, Ok_star_Eloc, Eloc, Ok_star_Ok
+
+
+def evolve(machine, time_steps, dt, h=0.5, sampler=None):
+  """Evolves an initialized machine.
+
+  Args:
+    machine: A machine object that inherits `BaseStepMachine`.
+    time_steps: Number of steps to evolve (initial step not included).
+    dt: Size of time steps.
+    h: Value of magnetic field in evolution Hamiltonian.
+
+  Returns:
+    full_psi: The full wavefunction of the evolution with shape (T+1,2^N).
+  """
+  n_sites = machine.n_sites
+  full_psi = [machine.dense()]
+  if sampler is not None:
+    configs = np.zeros([sampler.n_samples, n_sites], dtype=np.int32)
+
+  for step in range(time_steps):
+    if sampler is None:
+      rhs, Ok, Ok_star_Eloc, Eloc, Ok_star_Ok = exact_tvmc_step(machine, h=h)
+    else:
+      sampler.run(machine.dense(), n_sites, 1, 2**n_sites, sampler.n_samples,
+                  sampler.n_corr, sampler.n_burn, configs)
+      rhs, Ok, Ok_star_Eloc, Eloc, Ok_star_Ok = sampling_tvmc_step(machine,
+                                                                   configs,
+                                                                   h=h)
+
+    machine.update(-1j * rhs * dt)
+    full_psi.append(machine.dense())
+  return np.array(full_psi)
