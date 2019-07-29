@@ -72,6 +72,15 @@ def sampling_tvmc_step(machine, configs, h=0.5):
 
   Here VarPar = machine.shape
   """
+  def batched_mean(grads, size=100):
+    assert len(grads) % size == 0
+    n = len(grads) // size
+    s = 0.0
+    for i in range(n):
+      s += (grads[i * size: (i + 1) * size, :, np.newaxis] *
+            grads[i * size: (i + 1) * size, np.newaxis]).sum(axis=0)
+    return s / len(grads)
+
   # TODO: Remove `exact_tvmc_step` and add its functionality in
   # the current method when configs=None is given.
   Eloc_samples = vmc_energy(machine, configs, h=h)
@@ -86,8 +95,7 @@ def sampling_tvmc_step(machine, configs, h=0.5):
   Ok_star_Eloc = (Eloc_samples[:, np.newaxis] * grads.conj()).mean(axis=0)
   Fk = Ok_star_Eloc - Ok.conj() * Eloc
 
-  Ok_star_Ok = (grads[:, :, np.newaxis].conj() *
-                grads[:, np.newaxis]).mean(axis=0)
+  Ok_star_Ok = batched_mean(grads)
   Skk = Ok_star_Ok - np.outer(Ok.conj(), Ok)
 
   rhs, info = linalg.gmres(Skk, Fk)
