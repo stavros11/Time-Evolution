@@ -40,7 +40,7 @@ def exact_tvmc_step(machine, h=0.5):
   grads = machine.gradient(all_configs)
   flattened_shape = (len(grads), np.prod(grads.shape[1:]))
   grads = grads.reshape(flattened_shape)
-  Ok = (psi2 * grads).mean(axis=0) / norm2
+  Ok = (psi2[:, np.newaxis] * grads).mean(axis=0) / norm2
 
   Ok_star_Eloc = (psi2[:, np.newaxis] * Eloc_samples[:, np.newaxis]
                   * grads.conj()).mean(axis=0) / norm2
@@ -51,7 +51,7 @@ def exact_tvmc_step(machine, h=0.5):
                 grads[:, np.newaxis]).mean(axis=0)
   Skk = Ok_star_Ok - np.outer(Ok.conj(), Ok)
 
-  rhs = linalg.gmres(Skk, Fk)
+  rhs, info = linalg.gmres(Skk, Fk)
   return rhs, Ok, Ok_star_Eloc, Eloc, Ok_star_Ok
 
 
@@ -90,5 +90,5 @@ def sampling_tvmc_step(machine, configs, h=0.5):
                 grads[:, np.newaxis]).mean(axis=0)
   Skk = Ok_star_Ok - np.outer(Ok.conj(), Ok)
 
-  rhs = linalg.gmres(Skk, Fk)
+  rhs, info = linalg.gmres(Skk, Fk)
   return rhs, Ok, Ok_star_Eloc, Eloc, Ok_star_Ok

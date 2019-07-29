@@ -216,7 +216,7 @@ class SmallMPSStepMachine(SmallMPSMachine):
     self._dense = self._create_envs()
 
   def dense(self):
-    return self._dense
+    return self._dense.reshape((self.n_states,))
 
   def wavefunction(self, configs):
     # Configs should be in {-1, 1} convention
@@ -247,9 +247,12 @@ class SmallMPSStepMachine(SmallMPSMachine):
     left_slicer = tuple(configs_t[:-1])
     grads[srng, -1, configs_t[-1]] = self.left[-1][left_slicer].swapaxes(-2, -1)
 
-    dense_slicer = tuple(configs_t) + (len(self.shape) - 1) * (np.newaxis,)
+    dense_slicer = tuple(configs_t) + len(self.shape) * (np.newaxis,)
     return grads / self._dense[dense_slicer]
 
   def update(self, to_add):
+    if to_add.shape != self.shape:
+      to_add = to_add.reshape(self.shape)
+
     self.tensors += to_add
     self._dense = self._create_envs()
