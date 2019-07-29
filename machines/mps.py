@@ -224,6 +224,8 @@ class SmallMPSStepMachine(SmallMPSMachine):
     return self._dense[configs_sl]
 
   def gradient(self, configs):
+    #TODO: Redefine gradient in SmallMPSMachine class to avoid
+    # code repetition here
     # Configs should be in {-1, 1} convention
     configs_t = (configs < 0).astype(configs.dtype).T
     n_samples = len(configs)
@@ -247,3 +249,7 @@ class SmallMPSStepMachine(SmallMPSMachine):
 
     dense_slicer = tuple(configs_t) + (len(self.shape) - 1) * (np.newaxis,)
     return grads / self._dense[dense_slicer]
+
+  def update(self, to_add):
+    self.tensors += to_add
+    self._dense = self._create_envs()
