@@ -75,7 +75,7 @@ class SmallMPSMachine(base.BaseMachine):
 
   def _expr(self, s1, s2):
     """Returns einsum expression for _create_envs."""
-    return "t{}xy,t{}yz->t{}{}xz".format(s1, s2, s1, s2)
+    return "...{}xy,...{}yz->...{}{}xz".format(s1, s2, s1, s2)
 
   SYMBOLS = "abcdefghijklmnopqrstuvw"
 
@@ -90,19 +90,21 @@ class SmallMPSMachine(base.BaseMachine):
     and similarly for self.right.
     The time index is included as the first axis in the above shapes every time.
     """
-    self.left = [np.copy(self.tensors[:, 0])]
-    self.right = [np.copy(self.tensors[:, -1])]
+    tensor = lambda i: self.tensors[..., i, :, :, :]
+
+    self.left = [np.copy(tensor(0))]
+    self.right = [np.copy(tensor(-1))]
     for i in range(1, self.n_sites - 1):
       expr = self._expr(self.SYMBOLS[:i], self.SYMBOLS[i])
-      self.left.append(np.einsum(expr, self.left[-1], self.tensors[:, i]))
+      self.left.append(np.einsum(expr, self.left[-1], tensor(i)))
 
       expr = self._expr(self.SYMBOLS[i], self.SYMBOLS[:i])
-      self.right.append(np.einsum(expr, self.tensors[:, self.n_sites - i - 1],
+      self.right.append(np.einsum(expr, tensor(self.n_sites - i - 1),
                                   self.right[-1]))
 
     expr = self._expr(self.SYMBOLS[:self.n_sites - 1],
                       self.SYMBOLS[self.n_sites - 1])
-    dense = np.einsum(expr, self.left[-1], self.tensors[:, -1])
+    dense = np.einsum(expr, self.left[-1], tensor(-1))
     return np.trace(dense, axis1=-2, axis2=-1)
 
   def dense(self):
@@ -212,3 +214,36 @@ class SmallMPSStepMachine(SmallMPSMachine):
     self.shape = self.tensors.shape
 
     self._dense = self._create_envs()
+
+  def dense(self):
+    return self._dense
+
+  def wavefunction(self, configs):
+    # Configs should be in {-1, 1} convention
+    configs_sl = tuple((configs < 0).astype(configs.dtype).T)
+    return self._dense[configs_sl]
+
+  def gradient(self, configs):
+    # Configs should be in {-1, 1} convention
+    configs_t = (configs < 0).astype(configs.dtype).T
+    n_samples = len(configs)
+    srng = np.arange(n_samples)
+
+    grads = np.zeros((n_samples,) + self.shape, dtype=self.dtype)
+
+    right_slicer = tuple(configs_t[1:])
+    grads[srng, 0, configs_t[0]] = self.right[-1][right_slicer].swapaxes(-2, -1)
+    for i in range(1, self.n_sites - 1):
+      left_slicer = tuple(configs_t[:i])
+      left = self.left[i - 1][left_slicer]
+
+      right_slicer = tuple(configs_t[i + 1:])
+      right = self.right[self.n_sites - i - 2][right_slicer]
+
+      grads[srng, i, configs_t[i]] = np.einsum("bmi,bjm->bij", left, right)
+
+    left_slicer = tuple(configs_t[:-1])
+    grads[srng, -1, configs_t[-1]] = self.left[-1][left_slicer].swapaxes(-2, -1)
+
+    dense_slicer = tuple(configs_t) + (len(self.shape) - 1) * (np.newaxis,)
+    return grads / self._dense[dense_slicer]
