@@ -153,6 +153,10 @@ class SmallMPSMachine(base.BaseMachine):
 
 
 class SmallMPSMachineNorm(SmallMPSMachine):
+  """Normalizes the wavefunction by dividing every MPS tensor with the norm.
+
+  Norm calculation is tractable only for small systems.
+  """
 
   def __init__(self, init_state, time_steps, d_bond, d_phys=2):
     super().__init__(init_state, time_steps, d_bond, d_phys=2)
@@ -172,6 +176,10 @@ class SmallMPSMachineNorm(SmallMPSMachine):
 
 
 class SmallMPSMachineCanonical(SmallMPSMachine):
+  """Normalizes the wavefunction by turning MPS to canonical form.
+
+  DOES NOT WORK PROPERLY.
+  """
 
   def __init__(self, init_state, time_steps, d_bond, d_phys=2):
     super().__init__(init_state, time_steps, d_bond, d_phys=2)
@@ -185,3 +193,24 @@ class SmallMPSMachineCanonical(SmallMPSMachine):
     self.tensors *= self.canonical_mask
     self._to_canonical_form()
     self._dense = self._create_envs()
+
+
+class SmallMPSStepMachine(SmallMPSMachine):
+  """MPS machine for small systems - uses dense wavefunctions.
+
+  Used for traditional t-VMC evolution.
+  """
+
+  def __init__(self, init_state, d_bond, d_phys=2):
+    self.n_states = len(init_state)
+    self.n_sites = int(np.log2(self.n_states))
+    self.d_bond, self.d_phys = d_bond, d_phys
+    self.name = "mpsD{}".format(d_bond)
+
+    tensors = np.array(mps_utils.dense_to_mps(init_state, d_bond))
+    self.tensors = tensors.transpose([0, 2, 1, 3])
+    self.dtype = self.tensors.dtype
+    self.shape = self.tensors.shape
+
+    self._dense = self._create_envs()
+    self.bin_to_dec = 2**np.arange(self.n_sites)
