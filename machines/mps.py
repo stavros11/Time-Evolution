@@ -22,7 +22,6 @@ class SmallMPSMachine(base.BaseMachine):
     self.shape = self.tensors[1:].shape
 
     self._dense = self._create_envs()
-    self.bin_to_dec = 2**np.arange(self.n_sites)
 
   def _vectorized_svd_split(self, m):
     """Splits multiple MPS tensors simultaneously.
@@ -205,7 +204,7 @@ class SmallMPSStepMachine(SmallMPSMachine):
     self.n_states = len(init_state)
     self.n_sites = int(np.log2(self.n_states))
     self.d_bond, self.d_phys = d_bond, d_phys
-    self.name = "mpsD{}".format(d_bond)
+    self.name = "stepmpsD{}".format(d_bond)
 
     tensors = np.array(mps_utils.dense_to_mps(init_state, d_bond))
     self.tensors = tensors.transpose([0, 2, 1, 3])
@@ -213,4 +212,3 @@ class SmallMPSStepMachine(SmallMPSMachine):
     self.shape = self.tensors.shape
 
     self._dense = self._create_envs()
-    self.bin_to_dec = 2**np.arange(self.n_sites)
