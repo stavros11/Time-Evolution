@@ -75,9 +75,10 @@ def sampling_tvmc_step(machine, configs, h=0.5):
   def batched_mean(grads, size=100):
     assert len(grads) % size == 0
     n = len(grads) // size
-    s = 0.0
+    d = grads.shape[-1]
+    s = np.zeros((d, d), dtype=grads.dtype)
     for i in range(n):
-      s += (grads[i * size: (i + 1) * size, :, np.newaxis] *
+      s += (grads[i * size: (i + 1) * size, :, np.newaxis].conj() *
             grads[i * size: (i + 1) * size, np.newaxis]).sum(axis=0)
     return s / len(grads)
 
