@@ -1,14 +1,24 @@
 """Methods for applying traditional t-VMC updates."""
 
+import operator
+import functools
 import itertools
 import numpy as np
 from scipy.sparse import linalg
 
 
-def vmc_energy(machine, configs, h, psi=None):
-  if psi is None:
-    psi = machine.wavefunction(configs)
+def vmc_energy(machine, configs, h):
+  """Calculates samples of TFIM energy for given spin configurations.
 
+  Args:
+    machine: Machine object that inherits `BaseStepMachine`.
+    configs: Spin configurations of shape (Ns, N).
+    h: Value of magnetic field in evolution Hamiltonian.
+
+  Returns:
+    Energy samples of shape (Ns,).
+  """
+  psi = machine.wavefunction(configs)
   # shape (Nsamples,)
   classical_energy = (configs[:, 1:] * configs[:, :-1]).sum(axis=1)
   classical_energy += configs[:, 0] * configs[:, -1]
@@ -26,6 +36,15 @@ def vmc_energy(machine, configs, h, psi=None):
 
 
 def batched_mean(grads, size=100):
+  """Calculates <Ok*Ok> with batches to avoid MemoryError.
+
+  Args:
+    grads: The gradient shamples with shape (Ns, VarPar).
+    size: Size of batches to use. Must be a divisor of len(grads).
+
+  Returns:
+    <Ok*Ok> of shape (VarPar, VarPar).
+  """
   assert len(grads) % size == 0
   n = len(grads) // size
   d = grads.shape[-1]
@@ -34,6 +53,13 @@ def batched_mean(grads, size=100):
     s += (grads[i * size: (i + 1) * size, :, np.newaxis].conj() *
           grads[i * size: (i + 1) * size, np.newaxis]).sum(axis=0)
   return s / len(grads)
+
+
+def product_mean(*tensors):
+  """Calculates mean of product of tensors.
+
+  Mean is calculated over the axis=0."""
+  return functools.reduce(operator.mul, tensors).mean(axis=0)
 
 
 def sampling_tvmc_step(machine, configs=None, h=0.5):
@@ -62,26 +88,29 @@ def sampling_tvmc_step(machine, configs=None, h=0.5):
     psi2 = np.abs(psi)**2
     norm2 = psi2.sum()
 
+    def prod_mean(*tensors):
+      slicer = (slice(None),) + (len(tensors[0].shape) - 1) * (np.newaxis,)
+      return product_mean(*tensors, psi2[slicer]) / norm2
+
+    batch_mean = lambda grads: prod_mean(grads[:, :, np.newaxis].conj(),
+                                         grads[:, np.newaxis])
+
+  else:
+    prod_mean = product_mean
+    batch_mean = batched_mean
+
+
   Eloc_samples = vmc_energy(machine, configs, h=h)
+  Eloc = prod_mean(Eloc_samples)
 
   # grad samples with shape (Nsamples,) + machine.shape
   grads = machine.gradient(configs)
   flattened_shape = (len(grads), np.prod(grads.shape[1:]))
   grads = grads.reshape(flattened_shape)
+  Ok = prod_mean(grads)
 
-  if exact:
-    Eloc = (psi2 * Eloc_samples).mean() / norm2
-    Ok = (psi2[:, np.newaxis] * grads).mean(axis=0) / norm2
-    Ok_star_Eloc = (psi2[:, np.newaxis] * Eloc_samples[:, np.newaxis] *
-                    grads.conj()).mean(axis=0) / norm2
-    Ok_star_Ok = (psi2[:, np.newaxis, np.newaxis] * grads[:, np.newaxis] *
-                    grads[:, :, np.newaxis].conj()).mean(axis=0) / norm2
-
-  else:
-    Eloc = Eloc_samples.mean()
-    Ok = grads.mean(axis=0)
-    Ok_star_Eloc = (Eloc_samples[:, np.newaxis] * grads.conj()).mean(axis=0)
-    Ok_star_Ok = batched_mean(grads)
+  Ok_star_Eloc = prod_mean(Eloc_samples[:, np.newaxis], grads.conj())
+  Ok_star_Ok = batch_mean(grads)
 
   Fk = Ok_star_Eloc - Ok.conj() * Eloc
   Skk = Ok_star_Ok - np.outer(Ok.conj(), Ok)
