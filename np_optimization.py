@@ -16,20 +16,28 @@ time_steps = 20
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
-n_epochs = 10000
+n_epochs = 30000
 n_message = 500
+init_prod = True
 
 t_grid = np.linspace(0.0, t_final, time_steps + 1)
 dt = t_grid[1] - t_grid[0]
 
 ham = utils.tfim_hamiltonian(n_sites, h=h_ev)
 ham2 = ham.dot(ham)
-exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
-                                              h0=h_init, h=h_ev)
+
+if init_prod:
+  init_state = np.ones(2**n_sites) / np.sqrt(2**n_sites)
+  exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
+                                                h=h_ev,
+                                                init_state=init_state)
+else:
+  exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
+                                                h0=h_init, h=h_ev)
 
 # Initialize machine
 #machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=8)
+machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=3)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 history = {"overlaps" : [], "avg_overlaps": [], "exact_Eloc": []}
@@ -60,7 +68,10 @@ for epoch in range(n_epochs):
     print("Averaged Overlap: {}".format(history["avg_overlaps"][-1]))
 
 # Save history
-filename = "allstates_{}_N{}M{}.h5py".format(machine.name, n_sites, time_steps)
+if init_prod:
+  filename = "initprod_allstates_{}_N{}M{}.h5py".format(machine.name, n_sites, time_steps)
+else:
+  filename = "allstates_{}_N{}M{}.h5py".format(machine.name, n_sites, time_steps)
 file = h5py.File("histories/{}".format(filename), "w")
 for k in history.keys():
   file[k] = history[k]

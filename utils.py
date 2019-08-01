@@ -63,8 +63,28 @@ def overlap(state1, state2, normalize_states=True):
   return np.abs(prod)**2
 
 
+def time_overlap(state1, state2, normalize_states=True):
+  """Calculates the overlap two state evolutions as a function of time.
+
+  Args:
+    state1: State of shape (M + 1, 2**N)
+    state2: State of shape (M + 1, 2**N)
+    normalize_states: If true it normalizes the states before the overlap
+      calculation.
+
+  Returns:
+    Overlap with shape (M + 1,)
+  """
+  prod = (state1.conj() * state2).sum(axis=1)
+  if normalize_states:
+    norms1 = (np.abs(state1)**2).sum(axis=1)
+    norms2 = (np.abs(state2)**2).sum(axis=1)
+    return (np.abs(prod)**2 / (norms1 * norms2))
+  return np.abs(prod)**2
+
+
 def averaged_overlap(state1, state2, normalize_states=True):
-  """Calculates averaged over time overlap between to state evolutions.
+  """Calculates averaged over time overlap between two state evolutions.
 
   Args:
     state1: State of shape (M + 1, 2**N)
@@ -75,12 +95,7 @@ def averaged_overlap(state1, state2, normalize_states=True):
   Returns:
     Overlap as a real number.
   """
-  prod = (state1.conj() * state2).sum(axis=1)
-  if normalize_states:
-    norms1 = (np.abs(state1)**2).sum(axis=1)
-    norms2 = (np.abs(state2)**2).sum(axis=1)
-    return (np.abs(prod)**2 / (norms1 * norms2)).mean()
-  return (np.abs(prod)**2).mean()
+  return time_overlap(state1, state2, normalize_states=normalize_states).mean()
 
 
 def ev_local(state, op):
@@ -190,8 +205,8 @@ def tfim_mpo(n_sites, h=1.0, dtype=np.complex128):
                   [right_matrix, right_vector])
 
 
-def tfim_exact_evolution(n_sites, t_final, time_steps, h0=1.0, h=0.5,
-                         dtype=np.complex128):
+def tfim_exact_evolution(n_sites, t_final, time_steps, h0=None, h=0.5,
+                         init_state=None, dtype=np.complex128):
   """Exact unitary evolution of TFIM using full propagator matrix.
 
   Args:
@@ -208,18 +223,23 @@ def tfim_exact_evolution(n_sites, t_final, time_steps, h0=1.0, h=0.5,
     observables: Dictionary with energy and sigma_x for every time step.
   """
   dt = t_final / time_steps
-  Hinit = tfim_hamiltonian(n_sites, h=h0)
   Hevolve = tfim_hamiltonian(n_sites, h=h)
+  Udt = la.expm(-1j * dt * Hevolve)
   pauli = Pauli(dtype=dtype)
 
-  gs0 = la.eigh(Hinit)[1][:, 0]
-  Udt = la.expm(-1j * dt * Hevolve)
+  if init_state is None:
+    if h0 is None:
+      h0 = 1.0
+    Hinit = tfim_hamiltonian(n_sites, h=h0)
+    init_state = la.eigh(Hinit)[1][:, 0]
+  else:
+    init_state = init_state.astype(dtype)
 
   rtype = rtype_from_ctype(dtype)
   sigma_x = np.zeros(time_steps + 1, dtype=rtype)
   energy = np.zeros(time_steps + 1, dtype=rtype)
 
-  state = [np.copy(gs0)]
+  state = [np.copy(init_state)]
   sigma_x[0] = ev_local(state[0], pauli.X).real
   energy[0] = (np.conj(state[0]) * Hevolve.dot(state[0])).sum().real
   for i in range(1, time_steps + 1):
