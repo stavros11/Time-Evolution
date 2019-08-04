@@ -16,9 +16,11 @@ time_steps = 20
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
-n_epochs = 30000
+n_epochs = 10000
 n_message = 500
-init_prod = True
+init_prod = False
+fullwv = True
+norm_clock = True
 
 t_grid = np.linspace(0.0, t_final, time_steps + 1)
 dt = t_grid[1] - t_grid[0]
@@ -36,17 +38,22 @@ else:
                                                 h0=h_init, h=h_ev)
 
 # Initialize machine
-#machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=3)
+if fullwv:
+  machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
+else:
+  machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=3)
 optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
 
 history = {"overlaps" : [], "avg_overlaps": [], "exact_Eloc": []}
 full_psi = machine.dense()
 for epoch in range(n_epochs):
-  Ok, Ok_star_Eloc, Eloc, _ = full_np.all_states_sampling_gradient(machine,
-                                                                   ham,
-                                                                   dt,
-                                                                   Ham2=ham2)
+  if fullwv:
+    Ok, Ok_star_Eloc, Eloc, _ = full_np.all_states_gradient(full_psi, ham, dt,
+                                                            norm=norm_clock,
+                                                            Ham2=ham2)
+  else:
+    Ok, Ok_star_Eloc, Eloc, _ = full_np.all_states_sampling_gradient(
+        machine, ham, dt, norm=norm_clock, Ham2=ham2)
 
   grad = Ok_star_Eloc - Ok.conj() * Eloc
   if grad.shape[1:] != machine.shape[1:]:
