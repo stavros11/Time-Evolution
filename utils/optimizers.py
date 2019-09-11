@@ -7,7 +7,7 @@ class BaseOptimizer:
   def __init__(self):
     pass
 
-  def update(self, gradient, epoch):
+  def __call__(self, gradient, epoch):
     raise NotImplementedError
 
 
@@ -21,7 +21,7 @@ class AdamComplex(BaseOptimizer):
     self.beta1, self.beta2 = beta1, beta2
     self.alpha, self.eps = alpha, epsilon
 
-  def update(self, gradient, epoch):
+  def __call__(self, gradient, epoch):
     self.m = self.beta1 * self.m + (1 - self.beta1) * gradient
     comp_grad2 = gradient.real**2 + 1j * gradient.imag**2
     self.v = self.beta2 * self.v + (1 - self.beta2) * comp_grad2
