@@ -1,6 +1,6 @@
 import numpy as np
 from machines import mps
-from utils import mps as utils
+from utils.mps import mps as utils
 
 class SmallMPSStepMachine(mps.SmallMPSMachine):
   """MPS machine for small systems - uses dense wavefunctions.

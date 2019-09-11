@@ -2,7 +2,7 @@
 
 import numpy as np
 from machines import base
-from utils import mps as utils
+from utils.mps import mps as utils
 from typing import Tuple
 
 
@@ -41,7 +41,8 @@ class SmallMPSMachine(base.BaseMachine):
     assert Dl == self.d_bond
     assert Dr == self.d_bond
 
-    u, s, v = np.linalg.svd(m.reshape(batch_shape + (d * Dl, Dr)), full_matrices=False)
+    u, s, v = np.linalg.svd(m.reshape(batch_shape + (d * Dl, Dr)),
+                            full_matrices=False)
     sm = np.zeros(batch_shape + (self.d_bond, self.d_bond), dtype=m.dtype)
     slicer = len(batch_shape) * (slice(None),)
     sm[slicer + 2 * (range(self.d_bond),)] = s
@@ -54,7 +55,8 @@ class SmallMPSMachine(base.BaseMachine):
   def _to_canonical_form(self):
     for i in range(self.n_sites - 1):
       self.tensors[:, i], v = self._vectorized_svd_split(self.tensors[:, i])
-      self.tensors[:, i + 1] = np.einsum("tlm,tsmr->tslr", v, self.tensors[:, i + 1])
+      self.tensors[:, i + 1] = np.einsum("tlm,tsmr->tslr", v,
+                  self.tensors[:, i + 1])
 
   def _calculate_dense(self) -> np.ndarray:
     """Calculates the dense form of MPS.
