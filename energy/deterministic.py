@@ -9,14 +9,14 @@ Works with any model as it uses the full Hamiltonian matrix for the calculation.
 """
 import numpy as np
 import itertools
-from typing import Optional
 from machines import base
+from typing import List, Optional, Tuple
 
 
 def energy(psi_all: np.ndarray, ham: np.ndarray, dt: float,
            phi_phi: Optional[float] = None,
            ham2: Optional[np.ndarray] = None,
-           psi0: Optional[np.ndarray] = None):
+           psi0: Optional[np.ndarray] = None) -> Tuple[List[float], np.ndarray]:
   """Calculates Clock's expectation value.
 
   Args:
@@ -140,7 +140,8 @@ def all_states_Heffnorm(psi_all, Ham, dt, phi_phi=None, Ham2=None, psi0=None):
 def gradient(full_psi: np.ndarray, ham: np.ndarray, dt: float,
              norm: bool = False,
              ham2: Optional[np.ndarray] = None,
-             psi0: Optional[np.ndarray] = None):
+             psi0: Optional[np.ndarray] = None
+             ) -> Tuple[np.ndarray, np.ndarray, float, List[float]]:
   """Gradients of the Clock Hamiltonian with respect to a full wavefunction.
 
   Args:
@@ -191,7 +192,8 @@ def gradient(full_psi: np.ndarray, ham: np.ndarray, dt: float,
 
 
 def sampling_gradient(machine: base.BaseMachine, ham: np.ndarray, dt: float,
-                      norm: bool = False, ham2: Optional[np.ndarray] = None):
+                      norm: bool = False, ham2: Optional[np.ndarray] = None
+                      ) -> Tuple[np.ndarray, np.ndarray, float, List[float]]:
   """Determinisitc calculation but using the 'sampling way'.
 
   Useful to test machines that are originally designed for sampling.

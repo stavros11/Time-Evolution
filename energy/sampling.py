@@ -4,10 +4,12 @@ TFIM model is assumed!
 """
 import numpy as np
 from machines import base
+from typing import List, Tuple
 
 
 def energy(machine: base.BaseMachine, configs: np.ndarray, times: np.ndarray,
-           dt: float, h: float = 0.5):
+           dt: float, h: float = 0.5
+           ) -> Tuple[List[float], List[float], np.ndarray]:
   """Calculates Clock energy using samples.
 
   Args:
@@ -82,7 +84,8 @@ def energy(machine: base.BaseMachine, configs: np.ndarray, times: np.ndarray,
 
 
 def grad(machine: base.BaseMachine, configs: np.ndarray, times: np.ndarray,
-         dt: float, h: float = 0.5):
+         dt: float, h: float = 0.5
+         ) -> Tuple[np.ndarray, np.ndarray, float, List[float], List[float]]:
   """Calculates gradients using samples.
 
   Assumes that the machine has the same form at each time step, that is we
