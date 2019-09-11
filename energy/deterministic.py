@@ -7,6 +7,10 @@ calculate expectation values deterministically.
 (exponentially expensive sum - no sampling!)
 Works with any model as it uses the full Hamiltonian matrix for the calculation.
 """
+# Reminder: This script had a `normalized_clock` method implemented which was
+# calculating a Clock derived from the projected Schrodinger's equation.
+# This was removed because of change of the project's focus. If you need to
+# recover it use the `master_0919patch` branch.
 import numpy as np
 import itertools
 from machines import base
@@ -76,69 +80,7 @@ def energy(psi_all: np.ndarray, ham: np.ndarray, dt: float,
   return Heff_exact, Heff_samples
 
 
-def all_states_Heffnorm(psi_all, Ham, dt, phi_phi=None, Ham2=None, psi0=None):
-  """Calculates normalized Clock's expectation value.
-
-  See `all_states_Heff` docstring for details. The difference here is that
-  the Clock is defined from the projected Schrodinger equation instead of
-  the normal one.
-  """
-  M = len(psi_all) - 1
-
-  m_t = (np.abs(psi_all)**2).sum(axis=1)
-  invm_t = 1.0 / m_t
-
-  v_t = (psi_all[1:].conj() * psi_all[:-1]).sum(axis=1)
-  absv_t = np.abs(v_t)**2
-
-  Hpsi = Ham.dot(psi_all.T).T
-  h_t = (psi_all.conj() * Hpsi).sum(axis=1) / m_t
-  Hpsi -= h_t[:, np.newaxis] * psi_all
-
-  if phi_phi is None:
-    phi_phi = m_t.sum()
-
-  # H^0 term
-  n_Heff0 = np.zeros_like(psi_all)
-  n_Heff0[0] = 0.5 * (1.0 + absv_t[0] / m_t[0]**2) * psi_all[0]
-  n_Heff0[0] -= 0.5 * (invm_t[0] + invm_t[1]) * v_t[0].conj() * psi_all[1]
-
-  n_Heff0[M] = 0.5 * (1.0 + absv_t[-1] / m_t[M]**2) * psi_all[M]
-  n_Heff0[M] -= 0.5 * ((invm_t[M - 1] + invm_t[M]) * v_t[-1] * psi_all[M - 1])
-
-  c = 1.0 + (absv_t[1:] + absv_t[:-1]) / (2 * m_t[1:M]**2)
-  n_Heff0[1:M] = c[:, np.newaxis] * psi_all[1:M]
-  c = (v_t[:-1, np.newaxis] * psi_all[:M-1] +
-       v_t.conj()[1:, np.newaxis] * psi_all[2:])
-  n_Heff0[1:M] -= 0.5 * (invm_t[1:M] + invm_t[2:])[:, np.newaxis] * c
-  Heff_exact = [((np.conj(psi_all) * n_Heff0).sum() / phi_phi)]
-
-  # H^1 term
-  n_Heff1 = np.zeros_like(psi_all)
-  n_Heff1[0] = 0.5 * (v_t[0] - v_t[0].conj()) * Hpsi[0] / m_t[0] - Hpsi[1]
-  n_Heff1[M] = Hpsi[M-1] + 0.5 * (v_t[-1] - v_t[-1].conj()) * Hpsi[M] / m_t[M]
-
-  n_Heff1[1:M] = Hpsi[:M-1] - Hpsi[2:]
-  c = (v_t[1:] - v_t[1:].conj()) / m_t[1:M]
-  n_Heff1[1:M] += c[:, np.newaxis] * Hpsi[1:M]
-  Heff_exact.append(1j * (np.conj(psi_all) * n_Heff1).sum() * dt / phi_phi)
-
-  # H^2 term
-  n_Heff2 = Ham.dot(Hpsi.T).T - h_t[:, np.newaxis] * Hpsi
-  n_Heff2[0] *= 0.5
-  n_Heff2[M] *= 0.5
-  Heff_exact.append((np.conj(psi_all) * n_Heff2).sum() * dt * dt / phi_phi)
-
-  Heff_samples = n_Heff0 + 1j * n_Heff1 * dt + n_Heff2 * dt * dt
-  # Initial condition penalty term
-  if psi0 is not None:
-    Heff_samples[0] += psi_all[0] - (psi0.conj() * psi_all[0]).sum() * psi0
-
-  return Heff_exact, Heff_samples
-
-
 def gradient(full_psi: np.ndarray, ham: np.ndarray, dt: float,
-             norm: bool = False,
              ham2: Optional[np.ndarray] = None,
              psi0: Optional[np.ndarray] = None
              ) -> Tuple[np.ndarray, np.ndarray, float, List[float]]:
@@ -149,7 +91,6 @@ def gradient(full_psi: np.ndarray, ham: np.ndarray, dt: float,
       where N is the number of sites and M+1 the number of time steps.
     ham: Full (real space) Hamiltonian matrix of shape (2**N, 2**N).
     dt: Time step.
-    norm: If True it uses the normalized Clock construction..
     ham2: Square of spin Hamiltonian of shape (2**N, 2**N).
       If Ham2 is not given then it is calculated from Ham.
     psi0: If an initial condition is given as `psi0`, a penalty term is added
@@ -171,13 +112,8 @@ def gradient(full_psi: np.ndarray, ham: np.ndarray, dt: float,
     ham2 = ham.dot(ham)
 
   phi_phi = (np.abs(full_psi)**2).sum()
-  if norm:
-    Eloc_terms, Heff_samples = all_states_Heffnorm(full_psi, ham, dt,
-                                                   phi_phi=phi_phi, ham2=ham2,
-                                                   psi0=psi0)
-  else:
-    Eloc_terms, Heff_samples = energy(full_psi, ham, dt, phi_phi=phi_phi,
-                                      ham2=ham2, psi0=psi0)
+  Eloc_terms, Heff_samples = energy(full_psi, ham, dt, phi_phi=phi_phi,
+                                    ham2=ham2, psi0=psi0)
 
   Eloc = (np.conj(full_psi) * Heff_samples).sum() / phi_phi
 
@@ -203,12 +139,9 @@ def sampling_gradient(machine: base.BaseMachine, ham: np.ndarray, dt: float,
 
   full_psi = machine.dense()
   phi_phi = (np.abs(full_psi)**2).sum()
-  if norm:
-    Eloc_terms, Heff_samples = all_states_Heffnorm(full_psi, ham, dt,
-                                                   phi_phi=phi_phi, ham2=ham2)
-  else:
-    Eloc_terms, Heff_samples = energy(full_psi, ham, dt, phi_phi=phi_phi,
-                                      ham2=ham2)
+
+  Eloc_terms, Heff_samples = energy(full_psi, ham, dt, phi_phi=phi_phi,
+                                    ham2=ham2)
   Eloc = (np.conj(full_psi) * Heff_samples).sum() / phi_phi
 
   all_configs = np.array(list(itertools.product([1, -1], repeat=N)))
