@@ -14,8 +14,6 @@ Works with any model as it uses the full Hamiltonian matrix for the calculation.
 import numpy as np
 import itertools
 from machines import base
-from machines import full
-from machines import mps
 from typing import List, Optional, Tuple
 
 
@@ -169,10 +167,3 @@ def sampling_gradient(machine: base.BaseMachine,
   Ok_star_Eloc = (np.conj(weights) * Heff_samples[slicer]).sum(axis=1) / phi_phi
 
   return Ok[1:], Ok_star_Eloc[1:], Eloc, Eloc_terms
-
-
-# Maps each machine to the appropriate gradient calculation method
-machine_to_gradfunc = {full.FullWavefunctionMachine: gradient,
-                       full.FullWavefunctionMachineNormalized: gradient,
-                       mps.SmallMPSMachine: sampling_gradient,
-                       mps.SmallMPSMachineNorm: sampling_gradient}
