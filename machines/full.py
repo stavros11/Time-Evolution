@@ -22,6 +22,7 @@ class FullWavefunctionMachine(base.BaseMachine):
     self.psi = np.copy(psi)
     self.dtype = self.psi.dtype
 
+  @property
   def dense(self) -> np.ndarray:
     return self.psi.reshape((self.time_steps + 1, self.n_states))
 

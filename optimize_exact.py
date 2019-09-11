@@ -105,7 +105,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   # Save training histories and final wavefunction
   filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
   saving.save_histories(data_dir, filename, history)
-  saving.save_dense_wavefunction(data_dir, filename, machine.dense())
+  saving.save_dense_wavefunction(data_dir, filename, machine.dense)
 
 
 if __name__ == '__main__':

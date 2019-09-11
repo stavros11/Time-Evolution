@@ -43,7 +43,7 @@ def exact(exact_state: np.ndarray, machine: base.BaseMachine,
     machine.update(optimizer(grad, epoch))
 
     # TODO: Make dense property in machines
-    full_psi = machine.dense()
+    full_psi = machine.dense
 
     # TODO: Make this a loop with a dictionary key -> calc method
     # to avoid code repetition

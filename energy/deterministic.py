@@ -107,7 +107,7 @@ def gradient(machine: base.BaseMachine,
 
   Ok and Ok_star_Eloc have shape (M, 2**N) (or (M + 1, 2**N) if psi0 is given).
   """
-  full_psi = machine.dense()
+  full_psi = machine.dense
   M, Nstates = full_psi.shape
   M += -1
 
@@ -141,7 +141,7 @@ def sampling_gradient(machine: base.BaseMachine,
   N, M = machine.n_sites, machine.time_steps
   if ham2 is None: ham2 = ham.dot(ham)
 
-  full_psi = machine.dense()
+  full_psi = machine.dense
   phi_phi = (np.abs(full_psi)**2).sum()
 
   Eloc_terms, Heff_samples = energy(full_psi, ham, dt, phi_phi=phi_phi,

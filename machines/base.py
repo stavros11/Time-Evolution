@@ -18,6 +18,7 @@ class BaseMachine:
     self.shape = None # Shape of the variational parameters
     self.name = None # Name (str) of the machine for saving purposes
 
+  @property
   def dense(self) -> np.ndarray:
     """Calculates the dense (full wavefunction) form of the machine.
 

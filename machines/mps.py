@@ -112,6 +112,7 @@ class SmallMPSMachine(base.BaseMachine):
     dense = np.einsum(expr, self.left[-1], tensor(-1))
     return np.trace(dense, axis1=-2, axis2=-1)
 
+  @property
   def dense(self) -> np.ndarray:
     return self._dense.reshape((self.time_steps + 1, self.n_states))
 
