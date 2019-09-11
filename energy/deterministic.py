@@ -10,6 +10,7 @@ Works with any model as it uses the full Hamiltonian matrix for the calculation.
 import numpy as np
 import itertools
 from typing import Optional
+from machines import base
 
 
 def energy(psi_all: np.ndarray, ham: np.ndarray, dt: float,
@@ -189,20 +190,23 @@ def gradient(full_psi: np.ndarray, ham: np.ndarray, dt: float,
   return Ok, Ok_star_Eloc, Eloc, Eloc_terms
 
 
-def all_states_sampling_gradient(machine, Ham, dt, norm=False, Ham2=None):
-  """Use only to test the machines written for sampling purposes."""
+def sampling_gradient(machine: base.BaseMachine, ham: np.ndarray, dt: float,
+                      norm: bool = False, ham2: Optional[np.ndarray] = None):
+  """Determinisitc calculation but using the 'sampling way'.
+
+  Useful to test machines that are originally designed for sampling.
+  """
   N, M = machine.n_sites, machine.time_steps
-  if Ham2 is None:
-    Ham2 = Ham.dot(Ham)
+  if ham2 is None: ham2 = ham.dot(ham)
 
   full_psi = machine.dense()
   phi_phi = (np.abs(full_psi)**2).sum()
   if norm:
-    Eloc_terms, Heff_samples = all_states_Heffnorm(full_psi, Ham, dt,
-                                                   phi_phi=phi_phi, Ham2=Ham2)
+    Eloc_terms, Heff_samples = all_states_Heffnorm(full_psi, ham, dt,
+                                                   phi_phi=phi_phi, ham2=ham2)
   else:
-    Eloc_terms, Heff_samples = all_states_Heff(full_psi, Ham, dt,
-                                               phi_phi=phi_phi, Ham2=Ham2)
+    Eloc_terms, Heff_samples = energy(full_psi, ham, dt, phi_phi=phi_phi,
+                                      ham2=ham2)
   Eloc = (np.conj(full_psi) * Heff_samples).sum() / phi_phi
 
   all_configs = np.array(list(itertools.product([1, -1], repeat=N)))
