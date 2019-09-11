@@ -15,13 +15,16 @@ def exact(exact_state: np.ndarray, machine: base.BaseMachine,
 
   Args:
     exact_state: Exact state evolution with shape (T + 1, 2^N).
-    machine_type: A class creator from the implemented machines.
-      This will be used to create the machine to optimize.
-      The class should inherit machines.BaseMachine
+    machine: Machine object to optimize.
     grad_func: Method that calculates gradients.
       See `GradCalc` typing for the type of arguments and returns.
       Should be one of `energy.deterministic` gradient calculation methods
       with `ham` and the rest arguments specified.
+    n_epochs: Number of epochs to optimize for.
+    n_message: Every how many epochs to print messages during optimization.
+      If `None` no messages are printed.
+    optimizer: Optimizer object to use for updating the machine.
+      If `None` default Adam optimizer is used.
   """
   # TODO: Complete docstring
   time_steps = len(exact_state) - 1

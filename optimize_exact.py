@@ -1,6 +1,7 @@
 """Optimizes full wavefunction using numpy.
 
 Uses all states to calculate gradients.
+Currently only TFIM is supported.
 """
 import argparse
 import functools
@@ -55,9 +56,19 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          n_message: Optional[int] = None,
          h_init: Optional[float] = None,
          init_state: Optional[np.ndarray] = None):
-  """Main optimization script for exact (deterministic) calculations."""
-  # TODO: Complete docstring
+  """Main optimization script for exact (deterministic) calculations.
 
+  Args:
+    See parser definitions
+
+  Saves:
+    An .h5 with training histories in the directory
+      '{data_dir}/histories/{generated save name}.h5'
+    An .npy with the final wavefunction as a dense array in the directory
+      '{data_dir}/final_dense/{generated save name}.npy'
+    where 'generated save name = {save_name}_{machine.name}_N{n_sites}
+              M{time_steps}'.
+  """
   # Initialize TFIM Hamiltonian and calculate exact evolution
   if ((h_init is not None and init_state is not None) or
       (h_init is None and init_state is None)):
