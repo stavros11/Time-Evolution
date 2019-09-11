@@ -1,13 +1,15 @@
 """Base machine to be used for sampling calculations.
 
 All machines should inherit this.
+Machines are used when optimizing with sampling.
 """
+import numpy as np
 
 
 class BaseMachine:
   """Base machine to use with Clock optimization."""
 
-  def __init__(self, n_sites, time_steps):
+  def __init__(self, n_sites: int, time_steps: int):
     # Time steps do not include initial condition
     # __init__ should define the following attributes
     self.n_sites = n_sites
@@ -16,7 +18,7 @@ class BaseMachine:
     self.shape = None # Shape of the variational parameters
     self.name = None # Name (str) of the machine for saving purposes
 
-  def dense(self):
+  def dense(self) -> np.ndarray:
     """Calculates the dense (full wavefunction) form of the machine.
 
     This is used because the C++ sampler currently only supports full
@@ -27,7 +29,7 @@ class BaseMachine:
     """
     raise NotImplementedError
 
-  def wavefunction(self, configs, times):
+  def wavefunction(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
     """Calculates wavefunction value on given samples.
 
     For each time we have to calculate the wavefunction for the previous and
@@ -42,7 +44,7 @@ class BaseMachine:
     """
     raise NotImplementedError
 
-  def gradient(self, configs, times):
+  def gradient(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
     """Calculates gradient value on given samples.
 
     Args:
@@ -54,7 +56,7 @@ class BaseMachine:
     """
     raise NotImplementedError
 
-  def update(self, to_add):
+  def update(self, to_add: np.ndarray) -> np.ndarray:
     """Updates variational parameters.
 
     Args:
