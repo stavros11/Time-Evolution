@@ -2,113 +2,119 @@
 
 Uses sampling to calculate gradients.
 """
-
-import os
-import ctypes
-import h5py
+import argparse
+import functools
 import numpy as np
-import matplotlib.pyplot as plt
-import utils
-from energy import full_np
-from energy import sampling_np
-from machines import full, mps
-from numpy.ctypeslib import ndpointer
+import optimization
+from energy import deterministic
+from energy import sampling
+from machines import factory
+from samplers import samplers
+from utils import optimizers
+from utils import saving
+from utils import tfim
+from typing import Optional
 
 
-# Model parameters
-n_sites = 6
-time_steps = 20
-t_final = 1.0
-h_init = 1.0
-h_ev = 0.5
-sample_time = True
+parser = argparse.ArgumentParser()
+# Directories
+parser.add_argument("--data-dir", default="/home/stavros/DATA/Clock/",
+                    type=str, help="Basic directory that data is saved.")
+parser.add_argument("--save_name", default="sampling", type=str,
+                    help="Name to use for distinguish the saved training data.")
 
-# Optimization parameters
-n_epochs = 10000
-n_message = 200
+# System params
+parser.add_argument("--n-sites", default=6, type=int,
+                    help="Number of sites in the TFIM chain.")
+parser.add_argument("--time-steps", default=20, type=int,
+                    help="Number of time steps to evolve for. The initial "
+                          "condition is not included in this.")
+parser.add_argument("--t-final", default=1.0, type=float,
+                    help="Duration of the evolution.")
+parser.add_argument("--h-ev", default=0.5, type=float,
+                    help="Field under which TFIM is evolved.")
+parser.add_argument("--h-init", default=1.0, type=float,
+                    help="Field under which TFIM is initialized.")
+# TODO: Add a flag for giving an `init_state` instead of `h_init`.
 
-# Sampling parameters (per time when using the space only sampler)
-n_samples = 20000
-n_corr = 1
-n_burn = 10
+# Training params
+parser.add_argument("--machine-type", default="FullWavefunctionMachine",
+                    type=str,
+                    help="Machine name as is imported in machines.factory.")
+parser.add_argument("--n-epochs", default=10000, type=int,
+                    help="Number of epochs to train for.")
+parser.add_argument("--learning-rate", default=None, type=float,
+                    help="Adam optimizer learning rate.")
+parser.add_argument("--n-message", default=500, type=int,
+                    help="Every how many epochs to display messages.")
 
-t_grid = np.linspace(0.0, t_final, time_steps + 1)
-dt = t_grid[1] - t_grid[0]
+# Sampling params
+parser.add_argument("--n-samples", default=20000, type=int,
+                    help="Number of samples for quantities calculation.")
+parser.add_argument("--n-corr", default=1, type=int,
+                    help="Number of correlation moves in MCMC sampler.")
+parser.add_argument("--n-burn", default=10, type=int,
+                    help="Number of burn-in moves in MCMC sampler.")
+parser.add_argument("--sample-time", action="store_true",
+                    help="Whether to sample time or assume uniform distribution")
 
-ham = utils.tfim_hamiltonian(n_sites, h=h_ev)
-ham2 = ham.dot(ham)
-exact_state, obs = utils.tfim_exact_evolution(n_sites, t_final, time_steps,
-                                              h0=h_init, h=h_ev)
+# TODO: Merge this with `optimize_exact.py`
 
-# Initialize machine
-#machine = full.FullWavefunctionMachine(exact_state[0], time_steps)
-machine = mps.SmallMPSMachine(exact_state[0], time_steps, d_bond=5)
-optimizer = utils.AdamComplex(machine.shape, dtype=machine.dtype)
+def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
+         n_epochs: int,
+         machine_type: str,
+         n_samples: int, n_corr: int = 1, n_burn: int = 10,
+         sample_time: bool = True,
+         data_dir: str = "/home/stavros/DATA/Clock",
+         save_name: str = "allstates",
+         learning_rate: Optional[float] = None,
+         n_message: Optional[int] = None,
+         h_init: Optional[float] = None,
+         init_state: Optional[np.ndarray] = None,
+         **machine_params):
+  # Initialize TFIM Hamiltonian and calculate exact evolution
+  if ((h_init is not None and init_state is not None) or
+      (h_init is None and init_state is None)):
+    raise ValueError("Exactly one of `h_init` and `init_state` should "
+                     "be specified.")
+  t_grid = np.linspace(0, t_final, time_steps + 1)
+  dt = t_grid[1] - t_grid[0]
+  ham = tfim.tfim_hamiltonian(n_sites, h=h_ev, pbc=True)
+  exact_state, _ = tfim.tfim_exact_evolution(n_sites, t_final, time_steps,
+                                             h0=h_init, h=h_ev,
+                                             init_state=init_state)
+  ham2 = ham.dot(ham)
 
-# Initialize sampler
-if sample_time:
-  sampler = ctypes.CDLL(os.path.join(os.getcwd(), "samplers", "qtvmclib.so"))
-  sampler.run.argtypes = ([ndpointer(np.complex128, flags="C_CONTIGUOUS")] +
-                           6 * [ctypes.c_int] +
-                          [ndpointer(ctypes.c_int, flags="C_CONTIGUOUS"),
-                           ndpointer(ctypes.c_int, flags="C_CONTIGUOUS")])
-  sampler.run.restype = None
-  configs = np.zeros([n_samples, n_sites], dtype=np.int32)
-  times = np.zeros(n_samples, dtype=np.int32)
+  # Set gradient and deterministic energy calculation functions
+  grad_func = functools.partial(sampling.gradient, dt=dt, h=h_ev)
+  detenergy_func = functools.partial(deterministic.energy, ham=ham, dt=dt,
+                                     ham2=ham2)
 
-else:
-  sampler = ctypes.CDLL(os.path.join(os.getcwd(), "samplers", "spacevmclib.so"))
-  sampler.run.argtypes = ([ndpointer(np.complex128, flags="C_CONTIGUOUS")] +
-                           6 * [ctypes.c_int] +
-                          [ndpointer(ctypes.c_int, flags="C_CONTIGUOUS")])
-  sampler.run.restype = None
-  configs = np.zeros([n_samples * (time_steps + 1), n_sites], dtype=np.int32)
-  times = np.repeat(np.arange(time_steps + 1), n_samples).astype(np.int32)
+  # Set machine
+  params = {k: p for k, p in machine_params.items() if p is not None}
+  machine = getattr(factory, machine_type)(exact_state[0], time_steps, **params)
+
+  # Set optimizer
+  optimizer = None
+  if learning_rate is not None:
+    optimizer = optimizers.AdamComplex(machine.shape, dtype=machine.dtype,
+                                       alpha=learning_rate)
+
+  # Initialize sampler
+  sampler = [samplers.SpinOnly, samplers.SpinTime][sample_time]
+  sampler = samplers.SpinTime(n_sites, time_steps, n_samples, n_corr, n_burn)
+
+  # Optimize
+  history, machine = optimization.sampling(exact_state, machine, sampler,
+                                           grad_func, detenergy_func,
+                                           n_epochs, n_message, optimizer)
+
+  # Save training histories and final wavefunction
+  filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
+  saving.save_histories(data_dir, filename, history)
+  saving.save_dense_wavefunction(data_dir, filename, machine.dense)
 
 
-history = {"overlaps": [], "avg_overlaps": [],
-           "exact_Eloc": [], "sampled_Eloc": []}
-for epoch in range(n_epochs):
-  # Sample
-  if sample_time:
-    sampler.run(machine.dense(), n_sites, time_steps + 1, 2**n_sites,
-                n_samples, n_corr, n_burn, configs, times)
-  else:
-    sampler.run(machine.dense(), n_sites, time_steps + 1, 2**n_sites,
-                n_samples, n_corr, n_burn, configs)
-
-  # Calculate gradient
-  Ok, Ok_star_Eloc, Eloc, _, _ = sampling_np.vmc_gradients(machine, configs, times, dt, h=h_ev)
-  grad = Ok_star_Eloc - Ok.conj() * Eloc
-  # Update machine
-  machine.update(optimizer.update(grad, epoch))
-
-  # Calculate energy exactly (using all states) on the current machine state
-  exact_Eloc, _ = full_np.all_states_Heff(machine.dense(), ham, dt, Ham2=ham2)
-  exact_Eloc = np.array(exact_Eloc).sum()
-
-  history["overlaps"].append(utils.overlap(machine.dense(), exact_state))
-  history["avg_overlaps"].append(utils.averaged_overlap(machine.dense(), exact_state))
-  history["exact_Eloc"].append(exact_Eloc)
-  history["sampled_Eloc"].append(Eloc)
-  if epoch % n_message == 0:
-    Eloc_error = np.abs((Eloc - exact_Eloc) * 100.0 / exact_Eloc)
-    print("\nEpoch: {}".format(epoch))
-    print("Sampled Eloc: {}".format(Eloc))
-    print("Exact Eloc: {}".format(exact_Eloc))
-    print("Sampling/Exact Eloc error: {}%".format(Eloc_error))
-    print("Overlap: {}".format(history["overlaps"][-1]))
-    print("Averaged Overlap: {}".format(history["avg_overlaps"][-1]))
-
-# Save history
-sampling_type = ["space", ""][sample_time]
-filename = "{}sampling{}_{}_N{}M{}.h5py".format(
-    sampling_type, n_samples, machine.name, n_sites, time_steps)
-file = h5py.File("histories/{}".format(filename), "w")
-for k in history.keys():
-  file[k] = history[k]
-file.close()
-
-# Save final dense wavefunction
-filename = "{}.npy".format(filename[:-5])
-np.save("final_dense/{}".format(filename), machine.dense())
+if __name__ == '__main__':
+  args = parser.parse_args()
+  main(**vars(args))
