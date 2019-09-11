@@ -84,8 +84,9 @@ def energy(machine: base.BaseMachine, configs: np.ndarray, times: np.ndarray,
 
 
 def gradient(machine: base.BaseMachine, configs: np.ndarray, times: np.ndarray,
-         dt: float, h: float = 0.5
-         ) -> Tuple[np.ndarray, np.ndarray, float, List[float], List[float]]:
+             dt: float, h: float = 0.5
+             ) -> Tuple[np.ndarray, np.ndarray, float,
+                        List[float], List[float]]:
   """Calculates gradients using samples.
 
   Assumes that the machine has the same form at each time step, that is we
