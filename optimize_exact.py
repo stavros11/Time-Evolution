@@ -102,7 +102,8 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   # Set optimizer
   optimizer = None
   if learning_rate is not None:
-    optimizer = optimizers.AdamComplex(alpha=learning_rate)
+    optimizer = optimizers.AdamComplex(machine.shape, dtype=machine.dtype,
+                                       alpha=learning_rate)
 
   # Optimize
   history, machine = optimization.exact(exact_state, machine, grad_func,
