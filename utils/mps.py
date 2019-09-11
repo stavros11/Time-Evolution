@@ -1,9 +1,9 @@
-"""Various utilities for Matrix Product States."""
+"""Utilities for Matrix Product States."""
 
 import numpy as np
 
 
-def mps_to_dense(mps):
+def mps_to_dense(mps: np.ndarray) -> np.ndarray:
   """Transforms a MPS chain to a dense wavefunction.
 
   Args:
@@ -23,7 +23,7 @@ def mps_to_dense(mps):
   return np.trace(dense, axis1=-2, axis2=-1)
 
 
-def mpo_to_dense(mpo):
+def mpo_to_dense(mpo: np.ndarray) -> np.ndarray:
   """Transforms a MPO to a dense unitary operator.
 
   Args:
@@ -45,7 +45,7 @@ def mpo_to_dense(mpo):
   return np.trace(dense, axis1=-4, axis2=-1)
 
 
-def dense_to_mps(state, d_bond, d_phys=2):
+def dense_to_mps(state: np.ndarray, d_bond: int, d_phys: int = 2) -> np.ndarray:
   """Transforms a dense wavefunction to an approximate MPS form using SVD.
 
   Args:
@@ -74,7 +74,7 @@ def dense_to_mps(state, d_bond, d_phys=2):
   return array
 
 
-def svd_split(m):
+def svd_split(m: np.ndarray):
   """Splits an MPS tensor in two MPS tensors.
 
   Args:
