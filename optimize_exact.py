@@ -2,28 +2,56 @@
 
 Uses all states to calculate gradients.
 """
+import argparse
 import functools
-import h5py
 import numpy as np
 import optimization
 from energy import deterministic
+from machines import factory
 from utils import optimizers
+from utils import saving
 from utils import tfim
-from typing import Any, Optional
+from typing import Optional
 
 
-n_sites = 6
-time_steps = 20
-t_final = 1.0
-h_init = 1.0
-h_ev = 0.5
-n_epochs = 10000
-n_message = 500
-init_prod = False
+parser = argparse.ArgumentParser()
+# Directories
+parser.add_argument("--data-dir", default="/home/stavros/DATA/Clock/",
+                    type=str, help="Basic directory that data is saved.")
+parser.add_argument("--save_name", default="allstates", type=str,
+                    help="Name to use for distinguish the saved training data.")
+
+# System params
+parser.add_argument("--n-sites", default=4, type=int,
+                    help="Number of sites in the TFIM chain.")
+parser.add_argument("--time-steps", default=20, type=int,
+                    help="Number of time steps to evolve for. The initial "
+                          "condition is not included in this.")
+parser.add_argument("--t-final", default=1.0, type=float,
+                    help="Duration of the evolution.")
+parser.add_argument("--h-ev", default=0.5, type=float,
+                    help="Field under which TFIM is evolved.")
+parser.add_argument("--h-init", default=1.0, type=float,
+                    help="Field under which TFIM is initialized.")
+# TODO: Add a flag for giving an `init_state` instead of `h_init`.
+
+# Training params
+parser.add_argument("--machine-type", default="FullWavefunctionMachine",
+                    type=str,
+                    help="Machine name as is imported in machines.factory.")
+parser.add_argument("--n-epochs", default=10000, type=int,
+                    help="Number of epochs to train for.")
+parser.add_argument("--learning-rate", default=None, type=float,
+                    help="Adam optimizer learning rate.")
+parser.add_argument("--n-message", default=500, type=int,
+                    help="Every how many epochs to display messages.")
 
 
-def main(n_sites: int, time_steps: int, t_final: float, machine_type: Any,
-         h_ev: float, run_name: str, n_epochs: int,
+def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
+         n_epochs: int,
+         machine_type: str,
+         data_dir: str = "/home/stavros/DATA/Clock",
+         save_name: str = "allstates",
          learning_rate: Optional[float] = None,
          n_message: Optional[int] = None,
          h_init: Optional[float] = None,
@@ -43,11 +71,13 @@ def main(n_sites: int, time_steps: int, t_final: float, machine_type: Any,
                                              init_state=init_state)
 
 
-  # Prepare Clock energy calculation function
+  # Set Clock energy calculation function and machine
   if machine_type not in deterministic.machine_to_gradfunc:
     raise ValueError("Uknown machine type {}.".format(machine_type))
+
+  machine = getattr(factory, machine_type)(exact_state[0], time_steps)
   ham2 = ham.dot(ham)
-  grad_func = deterministic.machine_to_gradfunc[machine_type]
+  grad_func = factory.machine_to_gradfunc[machine_type]
   grad_func = functools.partial(grad_func, ham=ham, ham2=ham2)
 
   # Set optimizer
@@ -55,26 +85,18 @@ def main(n_sites: int, time_steps: int, t_final: float, machine_type: Any,
   if learning_rate is not None:
     optimizer = optimizers.AdamComplex(alpha=learning_rate)
 
-
   # Optimize
-  # TODO: Change `machine_type` to a machine object that you create here
-  # to make it more readable
-  history, full_psi = optimization.exact(exact_state, machine_type, grad_func,
-                                         n_epochs, n_message,
-                                         optimizer=optimizer)
+  history, machine = optimization.exact(exact_state, machine, grad_func,
+                                        n_epochs, n_message,
+                                        optimizer=optimizer)
 
 
-  # TODO: Fix filenames
-  # Save history
-  if init_prod:
-    filename = "al{}_N{}M{}.h5py".format(machine.name, n_sites, time_steps)
-  else:
-    filename = "allstates_{}_N{}M{}.h5py".format(machine.name, n_sites, time_steps)
-  file = h5py.File("histories/{}".format(filename), "w")
-  for k in history.keys():
-    file[k] = history[k]
-  file.close()
+  # Save training histories and final wavefunction
+  filename = "{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
+  saving.save_histories(data_dir, filename, history)
+  saving.save_dense_wavefunction(data_dir, filename, machine.dense())
 
-  # Save final dense wavefunction
-  filename = "{}.npy".format(filename[:-5])
-  np.save("final_dense/{}".format(filename), full_psi)
+
+if __name__ == '__main__':
+  args = parser.parse_args()
+  main(**vars(args))

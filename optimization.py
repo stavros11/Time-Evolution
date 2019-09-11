@@ -2,14 +2,14 @@ import numpy as np
 from machines import base
 from utils import calc
 from utils import optimizers
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
-GradCalc = Callable[base.BaseMachine,
+GradCalc = Callable[[base.BaseMachine],
                     Tuple[np.ndarray, np.ndarray, float, List[float]]]
 
 
-def exact(exact_state: np.ndarray, machine_type: Any, grad_func: GradCalc,
-          n_epochs: int, n_message: Optional[int] = None,
+def exact(exact_state: np.ndarray, machine: base.BaseMachine,
+          grad_func: GradCalc, n_epochs: int, n_message: Optional[int] = None,
           optimizer: Optional[optimizers.BaseOptimizer] = None):
   """Main optimization script for exact (deterministic) calculations.
 
@@ -26,8 +26,6 @@ def exact(exact_state: np.ndarray, machine_type: Any, grad_func: GradCalc,
   # TODO: Complete docstring
   time_steps = len(exact_state) - 1
 
-  # Initialize machine
-  machine = machine_type(exact_state[0], time_steps)
   if optimizer is None:
     optimizer = optimizers.AdamComplex(machine.shape, dtype=machine.dtype)
 
@@ -56,4 +54,4 @@ def exact(exact_state: np.ndarray, machine_type: Any, grad_func: GradCalc,
       for k in history.keys():
         print(": ".join(k, history[k][-1]))
 
-  return history, full_psi
+  return history, machine
