@@ -1,13 +1,15 @@
 """Optimizes full wavefunction using numpy.
 
-Uses all states to calculate gradients.
-Currently only TFIM is supported.
+Uses sampling to calculate gradients.
 """
 import argparse
 import functools
 import numpy as np
 import optimization
+from energy import deterministic
+from energy import sampling
 from machines import factory
+from samplers import samplers
 from utils import optimizers
 from utils import saving
 from utils import tfim
@@ -18,7 +20,7 @@ parser = argparse.ArgumentParser()
 # Directories
 parser.add_argument("--data-dir", default="/home/stavros/DATA/Clock/",
                     type=str, help="Basic directory that data is saved.")
-parser.add_argument("--save_name", default="allstates", type=str,
+parser.add_argument("--save_name", default="sampling", type=str,
                     help="Name to use for distinguish the saved training data.")
 
 # System params
@@ -35,17 +37,10 @@ parser.add_argument("--h-init", default=1.0, type=float,
                     help="Field under which TFIM is initialized.")
 # TODO: Add a flag for giving an `init_state` instead of `h_init`.
 
-# Machine params
+# Training params
 parser.add_argument("--machine-type", default="FullWavefunctionMachine",
                     type=str,
                     help="Machine name as is imported in machines.factory.")
-parser.add_argument("--d-bond", default=None, type=int,
-                    help="Bond dimension (only for MPS machines).")
-parser.add_argument("--d-phys", default=None, type=int,
-                    help="Physical dimension (only for MPS machines).")
-
-
-# Training params
 parser.add_argument("--n-epochs", default=10000, type=int,
                     help="Number of epochs to train for.")
 parser.add_argument("--learning-rate", default=None, type=float,
@@ -53,10 +48,22 @@ parser.add_argument("--learning-rate", default=None, type=float,
 parser.add_argument("--n-message", default=500, type=int,
                     help="Every how many epochs to display messages.")
 
+# Sampling params
+parser.add_argument("--n-samples", default=0, type=int,
+                    help="Number of samples for quantities calculation.")
+parser.add_argument("--n-corr", default=1, type=int,
+                    help="Number of correlation moves in MCMC sampler.")
+parser.add_argument("--n-burn", default=10, type=int,
+                    help="Number of burn-in moves in MCMC sampler.")
+parser.add_argument("--sample-time", action="store_true",
+                    help="Whether to sample time or assume uniform distribution")
+
 
 def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          n_epochs: int,
          machine_type: str,
+         n_samples: int, n_corr: int = 1, n_burn: int = 10,
+         sample_time: bool = True,
          data_dir: str = "/home/stavros/DATA/Clock",
          save_name: str = "allstates",
          learning_rate: Optional[float] = None,
@@ -64,7 +71,10 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          h_init: Optional[float] = None,
          init_state: Optional[np.ndarray] = None,
          **machine_params):
-  """Main optimization script for exact (deterministic) calculations.
+  """Main optimization script.
+
+  If n_samples == 0, deterministic calculation is used and all other sampling
+  parameters are ignored. Otherwise quantities are calculated with sampling.
 
   Args:
     See parser definitions
@@ -90,14 +100,8 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
                                              init_state=init_state)
 
   # Set machine
-  if machine_type not in factory.machine_to_gradfunc:
-    raise ValueError("Uknown machine type {}.".format(machine_type))
   params = {k: p for k, p in machine_params.items() if p is not None}
   machine = getattr(factory, machine_type)(exact_state[0], time_steps, **params)
-  # Set gradient calculation function
-  ham2 = ham.dot(ham)
-  grad_func = factory.machine_to_gradfunc[machine_type]
-  grad_func = functools.partial(grad_func, ham=ham, dt=dt, ham2=ham2)
 
   # Set optimizer
   optimizer = None
@@ -105,10 +109,29 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
     optimizer = optimizers.AdamComplex(machine.shape, dtype=machine.dtype,
                                        alpha=learning_rate)
 
-  # Optimize
-  history, machine = optimization.exact(exact_state, machine, grad_func,
-                                        n_epochs, n_message,
-                                        optimizer=optimizer)
+  # Set gradient and deterministic energy calculation functions
+  ham2 = ham.dot(ham)
+  if n_samples > 0:
+    grad_func = functools.partial(sampling.gradient, dt=dt, h=h_ev)
+    detenergy_func = functools.partial(deterministic.energy, ham=ham, dt=dt,
+                                       ham2=ham2)
+    # Initialize sampler
+    sampler = [samplers.SpinOnly, samplers.SpinTime][sample_time]
+    sampler = samplers.SpinTime(n_sites, time_steps, n_samples, n_corr, n_burn)
+    # Optimize
+    history, machine = optimization.sampling(exact_state, machine, sampler,
+                                             grad_func, detenergy_func,
+                                             n_epochs, n_message, optimizer)
+
+  else:
+    if machine_type not in factory.machine_to_gradfunc:
+      raise ValueError("Uknown machine type {}.".format(machine_type))
+    grad_func = factory.machine_to_gradfunc[machine_type]
+    grad_func = functools.partial(grad_func, ham=ham, dt=dt, ham2=ham2)
+    # Optimize
+    history, machine = optimization.exact(exact_state, machine, grad_func,
+                                          n_epochs, n_message,
+                                          optimizer=optimizer)
 
   # Save training histories and final wavefunction
   filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
