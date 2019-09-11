@@ -89,14 +89,11 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
                                              h0=h_init, h=h_ev,
                                              init_state=init_state)
 
-  # Set Clock energy calculation function and machine
+  # Set machine
   if machine_type not in factory.machine_to_gradfunc:
     raise ValueError("Uknown machine type {}.".format(machine_type))
-
-  # Set machine
   params = {k: p for k, p in machine_params.items() if p is not None}
   machine = getattr(factory, machine_type)(exact_state[0], time_steps, **params)
-
   # Set gradient calculation function
   ham2 = ham.dot(ham)
   grad_func = factory.machine_to_gradfunc[machine_type]
@@ -111,7 +108,6 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   history, machine = optimization.exact(exact_state, machine, grad_func,
                                         n_epochs, n_message,
                                         optimizer=optimizer)
-
 
   # Save training histories and final wavefunction
   filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
