@@ -83,7 +83,7 @@ def energy(machine: base.BaseMachine, configs: np.ndarray, times: np.ndarray,
   return Heff_vmc, Heff_std, Heff_samples
 
 
-def grad(machine: base.BaseMachine, configs: np.ndarray, times: np.ndarray,
+def gradient(machine: base.BaseMachine, configs: np.ndarray, times: np.ndarray,
          dt: float, h: float = 0.5
          ) -> Tuple[np.ndarray, np.ndarray, float, List[float], List[float]]:
   """Calculates gradients using samples.
