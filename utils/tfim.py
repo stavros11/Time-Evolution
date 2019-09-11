@@ -120,6 +120,8 @@ def tfim_exact_evolution(n_sites, t_final, time_steps, h0=None, h=0.5,
     Hinit = tfim_hamiltonian(n_sites, h=h0)
     init_state = la.eigh(Hinit)[1][:, 0]
   else:
+    if (np.abs(init_state)**2).sum() != 1.0:
+      raise ValueError("Given initial state is not normalized.")
     init_state = init_state.astype(dtype)
 
   rtype = misc.rtype_from_ctype(dtype)
