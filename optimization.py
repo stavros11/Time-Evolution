@@ -26,7 +26,6 @@ def exact(exact_state: np.ndarray, machine: base.BaseMachine,
     optimizer: Optimizer object to use for updating the machine.
       If `None` default Adam optimizer is used.
   """
-  # TODO: Complete docstring
   time_steps = len(exact_state) - 1
 
   if optimizer is None:
@@ -42,11 +41,7 @@ def exact(exact_state: np.ndarray, machine: base.BaseMachine,
 
     machine.update(optimizer(grad, epoch))
 
-    # TODO: Make dense property in machines
     full_psi = machine.dense
-
-    # TODO: Make this a loop with a dictionary key -> calc method
-    # to avoid code repetition
     history["exact_Eloc"].append(Eloc)
     history["overlaps"].append(calc.overlap(full_psi, exact_state))
     history["avg_overlaps"].append(calc.averaged_overlap(full_psi, exact_state))
