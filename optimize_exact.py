@@ -35,10 +35,17 @@ parser.add_argument("--h-init", default=1.0, type=float,
                     help="Field under which TFIM is initialized.")
 # TODO: Add a flag for giving an `init_state` instead of `h_init`.
 
-# Training params
+# Machine params
 parser.add_argument("--machine-type", default="FullWavefunctionMachine",
                     type=str,
                     help="Machine name as is imported in machines.factory.")
+parser.add_argument("--d-bond", default=None, type=int,
+                    help="Bond dimension (only for MPS machines).")
+parser.add_argument("--d-phys", default=None, type=int,
+                    help="Physical dimension (only for MPS machines).")
+
+
+# Training params
 parser.add_argument("--n-epochs", default=10000, type=int,
                     help="Number of epochs to train for.")
 parser.add_argument("--learning-rate", default=None, type=float,
@@ -55,7 +62,8 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          learning_rate: Optional[float] = None,
          n_message: Optional[int] = None,
          h_init: Optional[float] = None,
-         init_state: Optional[np.ndarray] = None):
+         init_state: Optional[np.ndarray] = None,
+         **machine_params):
   """Main optimization script for exact (deterministic) calculations.
 
   Args:
@@ -81,12 +89,15 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
                                              h0=h_init, h=h_ev,
                                              init_state=init_state)
 
-
   # Set Clock energy calculation function and machine
   if machine_type not in factory.machine_to_gradfunc:
     raise ValueError("Uknown machine type {}.".format(machine_type))
 
-  machine = getattr(factory, machine_type)(exact_state[0], time_steps)
+  # Set machine
+  params = {k: p for k, p in machine_params.items() if p is not None}
+  machine = getattr(factory, machine_type)(exact_state[0], time_steps, **params)
+
+  # Set gradient calculation function
   ham2 = ham.dot(ham)
   grad_func = factory.machine_to_gradfunc[machine_type]
   grad_func = functools.partial(grad_func, ham=ham, dt=dt, ham2=ham2)
