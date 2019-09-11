@@ -14,6 +14,8 @@ Works with any model as it uses the full Hamiltonian matrix for the calculation.
 import numpy as np
 import itertools
 from machines import base
+from machines import full
+from machines import mps
 from typing import List, Optional, Tuple
 
 
@@ -80,15 +82,17 @@ def energy(psi_all: np.ndarray, ham: np.ndarray, dt: float,
   return Heff_exact, Heff_samples
 
 
-def gradient(full_psi: np.ndarray, ham: np.ndarray, dt: float,
+def gradient(machine: base.BaseMachine,
+             ham: np.ndarray, dt: float,
              ham2: Optional[np.ndarray] = None,
              psi0: Optional[np.ndarray] = None
              ) -> Tuple[np.ndarray, np.ndarray, float, List[float]]:
   """Gradients of the Clock Hamiltonian with respect to a full wavefunction.
 
   Args:
-    full_psi: Full wavefunction at each time step of shape (M + 1, 2**N)
-      where N is the number of sites and M+1 the number of time steps.
+    machine: Machine to get `full_psi` from. Note that only the dense
+      wavefunction is used here, however we use machine as an argument
+      to be consistent with `sampling_gradient` method.
     ham: Full (real space) Hamiltonian matrix of shape (2**N, 2**N).
     dt: Time step.
     ham2: Square of spin Hamiltonian of shape (2**N, 2**N).
@@ -105,6 +109,7 @@ def gradient(full_psi: np.ndarray, ham: np.ndarray, dt: float,
 
   Ok and Ok_star_Eloc have shape (M, 2**N) (or (M + 1, 2**N) if psi0 is given).
   """
+  full_psi = machine.dense()
   M, Nstates = full_psi.shape
   M += -1
 
@@ -127,8 +132,9 @@ def gradient(full_psi: np.ndarray, ham: np.ndarray, dt: float,
   return Ok, Ok_star_Eloc, Eloc, Eloc_terms
 
 
-def sampling_gradient(machine: base.BaseMachine, ham: np.ndarray, dt: float,
-                      norm: bool = False, ham2: Optional[np.ndarray] = None
+def sampling_gradient(machine: base.BaseMachine,
+                      ham: np.ndarray, dt: float,
+                      ham2: Optional[np.ndarray] = None
                       ) -> Tuple[np.ndarray, np.ndarray, float, List[float]]:
   """Determinisitc calculation but using the 'sampling way'.
 
@@ -163,3 +169,10 @@ def sampling_gradient(machine: base.BaseMachine, ham: np.ndarray, dt: float,
   Ok_star_Eloc = (np.conj(weights) * Heff_samples[slicer]).sum(axis=1) / phi_phi
 
   return Ok[1:], Ok_star_Eloc[1:], Eloc, Eloc_terms
+
+
+# Maps each machine to the appropriate gradient calculation method
+machine_to_gradfunc = {full.FullWavefunctionMachine: gradient,
+                       full.FullWavefunctionMachineNormalized: gradient,
+                       mps.SmallMPSMachine: sampling_gradient,
+                       mps.SmallMPSMachineNorm: sampling_gradient}
