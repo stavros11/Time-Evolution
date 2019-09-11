@@ -9,7 +9,7 @@ from energy import deterministic
 # Maps each machine to the appropriate deterministic gradient
 # calculation method
 machine_to_gradfunc = {
-    FullWavefunctionMachine: deterministic.gradient,
-    FullWavefunctionMachineNormalized: deterministic.gradient,
-    SmallMPSMachine: deterministic.sampling_gradient,
-    SmallMPSMachineNorm: deterministic.sampling_gradient}
+    "FullWavefunctionMachine": deterministic.gradient,
+    "FullWavefunctionMachineNormalized": deterministic.gradient,
+    "SmallMPSMachine": deterministic.sampling_gradient,
+    "SmallMPSMachineNorm": deterministic.sampling_gradient}

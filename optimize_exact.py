@@ -6,7 +6,6 @@ import argparse
 import functools
 import numpy as np
 import optimization
-from energy import deterministic
 from machines import factory
 from utils import optimizers
 from utils import saving
@@ -22,7 +21,7 @@ parser.add_argument("--save_name", default="allstates", type=str,
                     help="Name to use for distinguish the saved training data.")
 
 # System params
-parser.add_argument("--n-sites", default=4, type=int,
+parser.add_argument("--n-sites", default=6, type=int,
                     help="Number of sites in the TFIM chain.")
 parser.add_argument("--time-steps", default=20, type=int,
                     help="Number of time steps to evolve for. The initial "
@@ -64,7 +63,8 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
       (h_init is None and init_state is None)):
     raise ValueError("Exactly one of `h_init` and `init_state` should "
                      "be specified.")
-
+  t_grid = np.linspace(0, t_final, time_steps + 1)
+  dt = t_grid[1] - t_grid[0]
   ham = tfim.tfim_hamiltonian(n_sites, h=h_ev, pbc=True)
   exact_state, _ = tfim.tfim_exact_evolution(n_sites, t_final, time_steps,
                                              h0=h_init, h=h_ev,
@@ -72,13 +72,13 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
 
 
   # Set Clock energy calculation function and machine
-  if machine_type not in deterministic.machine_to_gradfunc:
+  if machine_type not in factory.machine_to_gradfunc:
     raise ValueError("Uknown machine type {}.".format(machine_type))
 
   machine = getattr(factory, machine_type)(exact_state[0], time_steps)
   ham2 = ham.dot(ham)
   grad_func = factory.machine_to_gradfunc[machine_type]
-  grad_func = functools.partial(grad_func, ham=ham, ham2=ham2)
+  grad_func = functools.partial(grad_func, ham=ham, dt=dt, ham2=ham2)
 
   # Set optimizer
   optimizer = None
@@ -92,7 +92,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
 
 
   # Save training histories and final wavefunction
-  filename = "{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
+  filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
   saving.save_histories(data_dir, filename, history)
   saving.save_dense_wavefunction(data_dir, filename, machine.dense())
 

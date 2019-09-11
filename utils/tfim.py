@@ -23,17 +23,17 @@ def tfim_hamiltonian(n_sites, h=1.0, pbc=True, dtype=np.complex128):
   for i in range(n_sites - 1):
     matlist = identities[:]
     matlist[i], matlist[i + 1] = pauli.Z, pauli.Z
-    ham += misc.kron_list(matlist)
+    ham += calc.kron_list(matlist)
   if pbc:
     matlist = identities[:]
     matlist[0], matlist[-1] = pauli.Z, pauli.Z
-    ham += misc.kron_list(matlist)
+    ham += calc.kron_list(matlist)
 
   # Add field terms
   ham_f = np.zeros_like(ham)
   for i in range(n_sites - 1):
-    ham_f += misc.kron_list(identities[:i] + [pauli.X] + identities[i+1:])
-  ham_f += misc.kron_list(identities[:-1] + [pauli.X])
+    ham_f += calc.kron_list(identities[:i] + [pauli.X] + identities[i+1:])
+  ham_f += calc.kron_list(identities[:-1] + [pauli.X])
 
   return - ham - h * ham_f
 

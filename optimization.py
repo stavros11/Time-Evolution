@@ -52,6 +52,6 @@ def exact(exact_state: np.ndarray, machine: base.BaseMachine,
     if n_message is not None and epoch % n_message == 0:
       print("\nEpoch {}".format(epoch))
       for k in history.keys():
-        print(": ".join(k, history[k][-1]))
+        print("{}: {}".format(k, history[k][-1]))
 
   return history, machine
