@@ -1,26 +1,32 @@
-"""Calculates Clock energies and gradients. NumPy implementation.
+"""Methods for VMC optimization of Clock using exact calculations.
+
+Exact calculations = VMC with infinite samples.
 
 Requires the full wavefunction at each time step and uses all states to
 calculate expectation values deterministically.
 (exponentially expensive sum - no sampling!)
+Works with any model as it uses the full Hamiltonian matrix for the calculation.
 """
-
 import numpy as np
 import itertools
+from typing import Optional
 
 
-def all_states_Heff(psi_all, Ham, dt, phi_phi=None, Ham2=None, psi0=None):
+def energy(psi_all: np.ndarray, ham: np.ndarray, dt: float,
+           phi_phi: Optional[float] = None,
+           ham2: Optional[np.ndarray] = None,
+           psi0: Optional[np.ndarray] = None):
   """Calculates Clock's expectation value.
 
   Args:
     psi_all: Full wavefunction at each time step of shape (M+1, 2**N)
       where N is the number of sites and M+1 the number of time steps.
-    Ham: Full (real space) Hamiltonian matrix of shape (2**N, 2**N).
+    ham: Full (real space) Hamiltonian matrix of shape (2**N, 2**N).
     dt: Time step.
-    Ham2: Square of spin Hamiltonian of shape (2**N, 2**N).
+    ham2: Square of spin Hamiltonian of shape (2**N, 2**N).
     phi_phi: Norm of the full wave function.
-    psi0: If given an initial condition penalty term is added to the
-      Hamiltonian. This is typically not needed in variational approaches,
+    psi0: If an initial condition is given as `psi0`, a penalty term is added
+      to the Hamiltonian. This is usually not needed in variational approaches,
       since we impose the initial condition by fixing the initial parameters.
 
   If Ham2 or phi_phi are not given, they are calculated from Ham and psi_all.
@@ -38,8 +44,8 @@ def all_states_Heff(psi_all, Ham, dt, phi_phi=None, Ham2=None, psi0=None):
   if phi_phi is None:
     phi_phi = (np.abs(psi_all)**2).sum()
 
-  if Ham2 is None:
-    Ham2 = Ham.dot(Ham)
+  if ham2 is None:
+    ham2 = ham.dot(ham)
 
   # H^0 term
   n_Heff0 = np.zeros_like(psi_all)
@@ -50,13 +56,13 @@ def all_states_Heff(psi_all, Ham, dt, phi_phi=None, Ham2=None, psi0=None):
 
   # H^1 term
   n_Heff1 = np.zeros_like(psi_all)
-  n_Heff1[0] = - Ham.dot(psi_all[1])
-  n_Heff1[M] = Ham.dot(psi_all[M-1])
-  n_Heff1[1:M] = Ham.dot((psi_all[:M-1] - psi_all[2:]).T).T
+  n_Heff1[0] = - ham.dot(psi_all[1])
+  n_Heff1[M] = ham.dot(psi_all[M-1])
+  n_Heff1[1:M] = ham.dot((psi_all[:M-1] - psi_all[2:]).T).T
   Heff_exact.append(1j * (np.conj(psi_all) * n_Heff1).sum() * dt / phi_phi)
 
   # H^2 term
-  n_Heff2 = Ham2.dot(psi_all.T).T
+  n_Heff2 = ham2.dot(psi_all.T).T
   n_Heff2[0] *= 0.5
   n_Heff2[M] *= 0.5
   Heff_exact.append((np.conj(psi_all) * n_Heff2).sum() * dt * dt / phi_phi)
@@ -130,19 +136,22 @@ def all_states_Heffnorm(psi_all, Ham, dt, phi_phi=None, Ham2=None, psi0=None):
   return Heff_exact, Heff_samples
 
 
-def all_states_gradient(full_psi, Ham, dt, norm=False, Ham2=None, psi0=None):
+def gradient(full_psi: np.ndarray, ham: np.ndarray, dt: float,
+             norm: bool = False,
+             ham2: Optional[np.ndarray] = None,
+             psi0: Optional[np.ndarray] = None):
   """Gradients of the Clock Hamiltonian with respect to a full wavefunction.
 
   Args:
     full_psi: Full wavefunction at each time step of shape (M + 1, 2**N)
       where N is the number of sites and M+1 the number of time steps.
-    Ham: Full (real space) Hamiltonian matrix of shape (2**N, 2**N).
+    ham: Full (real space) Hamiltonian matrix of shape (2**N, 2**N).
     dt: Time step.
     norm: If True it uses the normalized Clock construction..
-    Ham2: Square of spin Hamiltonian of shape (2**N, 2**N).
+    ham2: Square of spin Hamiltonian of shape (2**N, 2**N).
       If Ham2 is not given then it is calculated from Ham.
-    psi0: If given then the initial variational parameters are included in
-      the gradient. This is typically not needed in variational approaches,
+    psi0: If an initial condition is given as `psi0`, a penalty term is added
+      to the Hamiltonian. This is usually not needed in variational approaches,
       since we impose the initial condition by fixing the initial parameters.
 
   Returns:
@@ -156,18 +165,17 @@ def all_states_gradient(full_psi, Ham, dt, norm=False, Ham2=None, psi0=None):
   M, Nstates = full_psi.shape
   M += -1
 
-  if Ham2 is None:
-    Ham2 = Ham.dot(Ham)
+  if ham2 is None:
+    ham2 = ham.dot(ham)
 
   phi_phi = (np.abs(full_psi)**2).sum()
   if norm:
-    Eloc_terms, Heff_samples = all_states_Heffnorm(full_psi, Ham, dt,
-                                                   phi_phi=phi_phi, Ham2=Ham2,
+    Eloc_terms, Heff_samples = all_states_Heffnorm(full_psi, ham, dt,
+                                                   phi_phi=phi_phi, ham2=ham2,
                                                    psi0=psi0)
   else:
-    Eloc_terms, Heff_samples = all_states_Heff(full_psi, Ham, dt,
-                                               phi_phi=phi_phi, Ham2=Ham2,
-                                               psi0=psi0)
+    Eloc_terms, Heff_samples = energy(full_psi, ham, dt, phi_phi=phi_phi,
+                                      ham2=ham2, psi0=psi0)
 
   Eloc = (np.conj(full_psi) * Heff_samples).sum() / phi_phi
 
