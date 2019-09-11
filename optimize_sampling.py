@@ -49,7 +49,7 @@ parser.add_argument("--n-message", default=500, type=int,
                     help="Every how many epochs to display messages.")
 
 # Sampling params
-parser.add_argument("--n-samples", default=20000, type=int,
+parser.add_argument("--n-samples", default=0, type=int,
                     help="Number of samples for quantities calculation.")
 parser.add_argument("--n-corr", default=1, type=int,
                     help="Number of correlation moves in MCMC sampler.")
@@ -72,6 +72,22 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          h_init: Optional[float] = None,
          init_state: Optional[np.ndarray] = None,
          **machine_params):
+  """Main optimization script.
+
+  If n_samples == 0, deterministic calculation is used and all other sampling
+  parameters are ignored. Otherwise quantities are calculated with sampling.
+
+  Args:
+    See parser definitions
+
+  Saves:
+    An .h5 with training histories in the directory
+      '{data_dir}/histories/{generated save name}.h5'
+    An .npy with the final wavefunction as a dense array in the directory
+      '{data_dir}/final_dense/{generated save name}.npy'
+    where 'generated save name = {save_name}_{machine.name}_N{n_sites}
+              M{time_steps}'.
+  """
   # Initialize TFIM Hamiltonian and calculate exact evolution
   if ((h_init is not None and init_state is not None) or
       (h_init is None and init_state is None)):
@@ -83,16 +99,22 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   exact_state, _ = tfim.tfim_exact_evolution(n_sites, t_final, time_steps,
                                              h0=h_init, h=h_ev,
                                              init_state=init_state)
-  ham2 = ham.dot(ham)
-
-  # Set gradient and deterministic energy calculation functions
-  grad_func = functools.partial(sampling.gradient, dt=dt, h=h_ev)
-  detenergy_func = functools.partial(deterministic.energy, ham=ham, dt=dt,
-                                     ham2=ham2)
 
   # Set machine
   params = {k: p for k, p in machine_params.items() if p is not None}
   machine = getattr(factory, machine_type)(exact_state[0], time_steps, **params)
+  # Set gradient and deterministic energy calculation functions
+  ham2 = ham.dot(ham)
+  if n_samples > 0:
+    grad_func = functools.partial(sampling.gradient, dt=dt, h=h_ev)
+    detenergy_func = functools.partial(deterministic.energy, ham=ham, dt=dt,
+                                       ham2=ham2)
+  else:
+    if machine_type not in factory.machine_to_gradfunc:
+      raise ValueError("Uknown machine type {}.".format(machine_type))
+    grad_func = factory.machine_to_gradfunc[machine_type]
+    grad_func = functools.partial(grad_func, ham=ham, dt=dt, ham2=ham2)
+
 
   # Set optimizer
   optimizer = None
@@ -100,14 +122,19 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
     optimizer = optimizers.AdamComplex(machine.shape, dtype=machine.dtype,
                                        alpha=learning_rate)
 
-  # Initialize sampler
-  sampler = [samplers.SpinOnly, samplers.SpinTime][sample_time]
-  sampler = samplers.SpinTime(n_sites, time_steps, n_samples, n_corr, n_burn)
-
-  # Optimize
-  history, machine = optimization.sampling(exact_state, machine, sampler,
-                                           grad_func, detenergy_func,
-                                           n_epochs, n_message, optimizer)
+  if n_samples > 0:
+    # Initialize sampler
+    sampler = [samplers.SpinOnly, samplers.SpinTime][sample_time]
+    sampler = samplers.SpinTime(n_sites, time_steps, n_samples, n_corr, n_burn)
+    # Optimize
+    history, machine = optimization.sampling(exact_state, machine, sampler,
+                                             grad_func, detenergy_func,
+                                             n_epochs, n_message, optimizer)
+  else:
+    # Optimize
+    history, machine = optimization.exact(exact_state, machine, grad_func,
+                                          n_epochs, n_message,
+                                          optimizer=optimizer)
 
   # Save training histories and final wavefunction
   filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
