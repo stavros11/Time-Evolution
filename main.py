@@ -100,8 +100,9 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
                                              init_state=init_state)
 
   # Set machine
-  params = {k: p for k, p in machine_params.items() if p is not None}
-  machine = getattr(factory, machine_type)(exact_state[0], time_steps, **params)
+  machine_params = {k: p for k, p in machine_params.items() if p is not None}
+  machine = getattr(factory, machine_type)(exact_state[0], time_steps,
+                   **machine_params)
 
   # Set optimizer
   optimizer = None
@@ -111,27 +112,27 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
 
   # Set gradient and deterministic energy calculation functions
   ham2 = ham.dot(ham)
+  opt_params = {"exact_state": exact_state, "machine": machine,
+                "n_epochs": n_epochs, "optimizer": optimizer,
+                "n_message": n_message}
   if n_samples > 0:
-    grad_func = functools.partial(sampling.gradient, dt=dt, h=h_ev)
-    detenergy_func = functools.partial(deterministic.energy, ham=ham, dt=dt,
-                                       ham2=ham2)
+    opt_params["grad_func"] = functools.partial(sampling.gradient,
+                                                dt=dt, h=h_ev)
+    opt_params["detenergy_func"] = functools.partial(deterministic.energy,
+                                                     ham=ham, dt=dt, ham2=ham2)
     # Initialize sampler
     sampler = [samplers.SpinOnly, samplers.SpinTime][sample_time]
-    sampler = samplers.SpinTime(n_sites, time_steps, n_samples, n_corr, n_burn)
-    # Optimize
-    history, machine = optimization.sampling(exact_state, machine, sampler,
-                                             grad_func, detenergy_func,
-                                             n_epochs, n_message, optimizer)
-
+    opt_params["sampler"] = sampler(n_sites, time_steps, n_samples,
+                                    n_corr, n_burn)
   else:
     if machine_type not in factory.machine_to_gradfunc:
       raise ValueError("Uknown machine type {}.".format(machine_type))
     grad_func = factory.machine_to_gradfunc[machine_type]
-    grad_func = functools.partial(grad_func, ham=ham, dt=dt, ham2=ham2)
-    # Optimize
-    history, machine = optimization.exact(exact_state, machine, grad_func,
-                                          n_epochs, n_message,
-                                          optimizer=optimizer)
+    opt_params["grad_func"] = functools.partial(grad_func, ham=ham, dt=dt,
+                                                ham2=ham2)
+
+  # Optimize
+  history, machine = optimization.globally(**opt_params)
 
   # Save training histories and final wavefunction
   filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
