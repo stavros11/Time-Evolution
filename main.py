@@ -60,6 +60,12 @@ parser.add_argument("--n-burn", default=10, type=int,
 parser.add_argument("--sample-time", action="store_true",
                     help="Whether to sample time or assume uniform distribution")
 
+# Additional machine parameters
+parser.add_argument("--d-bond", default=4, type=int,
+                    help="MPS bond dimension (relevant for MPS machines).")
+parser.add_argument("--d-phys", default=2, type=int,
+                    help="MPS physical dimension (relevant for MPS machines).")
+
 
 def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          n_epochs: int,
