@@ -2,6 +2,8 @@
 
 import numpy as np
 from machines import base
+from optimization import deterministic
+from typing import Callable
 
 
 class FullWavefunctionMachine(base.BaseMachine):
@@ -25,6 +27,10 @@ class FullWavefunctionMachine(base.BaseMachine):
   @property
   def dense(self) -> np.ndarray:
     return self.psi.reshape((self.time_steps + 1, self.n_states))
+
+  @property
+  def deterministic_gradient_func(self) -> Callable:
+    return deterministic.gradient
 
   def wavefunction(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
     # Configs should be in {-1, 1}

@@ -2,8 +2,9 @@
 
 import numpy as np
 from machines import base
+from optimization import deterministic
 from utils.mps import mps as utils
-from typing import Tuple
+from typing import Callable, Tuple
 
 
 class SmallMPSMachine(base.BaseMachine):
@@ -24,6 +25,14 @@ class SmallMPSMachine(base.BaseMachine):
     self.shape = self.tensors[1:].shape
 
     self._dense = self._create_envs()
+
+  @property
+  def dense(self) -> np.ndarray:
+    return self._dense.reshape((self.time_steps + 1, self.n_states))
+
+  @property
+  def deterministic_gradient_func(self) -> Callable:
+    return deterministic.sampling_gradient
 
   def _vectorized_svd_split(self, m: np.ndarray
                             ) -> Tuple[np.ndarray, np.ndarray]:
@@ -111,10 +120,6 @@ class SmallMPSMachine(base.BaseMachine):
                       self.SYMBOLS[self.n_sites - 1])
     dense = np.einsum(expr, self.left[-1], tensor(-1))
     return np.trace(dense, axis1=-2, axis2=-1)
-
-  @property
-  def dense(self) -> np.ndarray:
-    return self._dense.reshape((self.time_steps + 1, self.n_states))
 
   def wavefunction(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
     # Configs should be in {-1, 1} convention

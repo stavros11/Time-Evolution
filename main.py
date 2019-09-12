@@ -1,6 +1,6 @@
-"""Optimizes full wavefunction using numpy.
+"""Main optimization script.
 
-Uses sampling to calculate gradients.
+Works only for the TFIM model!
 """
 import argparse
 import functools
@@ -127,11 +127,8 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
     opt_params["sampler"] = sampler(n_sites, time_steps, n_samples,
                                     n_corr, n_burn)
   else:
-    if machine_type not in factory.machine_to_gradfunc:
-      raise ValueError("Uknown machine type {}.".format(machine_type))
-    grad_func = factory.machine_to_gradfunc[machine_type]
-    opt_params["grad_func"] = functools.partial(grad_func, ham=ham, dt=dt,
-                                                ham2=ham2)
+    opt_params["grad_func"] = functools.partial(
+        machine.deterministic_gradient_func, ham=ham, dt=dt, ham2=ham2)
 
   # Optimize
   history, machine = optimize.globally(**opt_params)
