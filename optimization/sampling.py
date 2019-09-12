@@ -1,7 +1,15 @@
+"""Methods for VMC optimization of Clock using sampling.
+
+TFIM model is assumed!
+"""
 import numpy as np
+from machines import base
+from typing import List, Tuple
 
 
-def vmc_energy(machine, configs, times, dt, h=0.5):
+def energy(machine: base.BaseMachine, configs: np.ndarray, times: np.ndarray,
+           dt: float, h: float = 0.5
+           ) -> Tuple[List[float], List[float], np.ndarray]:
   """Calculates Clock energy using samples.
 
   Args:
@@ -22,12 +30,13 @@ def vmc_energy(machine, configs, times, dt, h=0.5):
   # shape (3, Nsamples)
   psi = machine.wavefunction(configs, times)
   # Find boundary indices [ind0, ind(M)]
-  boundary_ind = [np.where(times == i)[0] for i in [0, M]]
+  bind0, bindT = tuple(np.where(times == i)[0] for i in [0, M])
 
   # H^0 term
   Heff0_samples = 2 - (psi[0] + psi[2]) / psi[1]
-  Heff0_samples[boundary_ind[0]] = 1 - psi[2][boundary_ind[0]] / psi[1][boundary_ind[0]]
-  Heff0_samples[boundary_ind[1]] = 1 - psi[0][boundary_ind[1]] / psi[1][boundary_ind[1]]
+
+  Heff0_samples[bind0] = 1 - psi[2][bind0] / psi[1][bind0]
+  Heff0_samples[bindT] = 1 - psi[0][bindT] / psi[1][bindT]
 
   # shape (Nsamples,)
   classical_energy = (configs[:, 1:] * configs[:, :-1]).sum(axis=1)
@@ -54,15 +63,15 @@ def vmc_energy(machine, configs, times, dt, h=0.5):
   Eloc = -classical_energy * psi / psi[1][np.newaxis] - h * X
   # shape (Nsamples,)
   Heff1_samples = Eloc[0] - Eloc[2]
-  Heff1_samples[boundary_ind[0]] = -Eloc[2][boundary_ind[0]]
-  Heff1_samples[boundary_ind[1]]= Eloc[0][boundary_ind[1]]
+  Heff1_samples[bind0] = -Eloc[2][bind0]
+  Heff1_samples[bindT]= Eloc[0][bindT]
   Heff1_samples *= 1j * dt
 
   # H^2 term
   # shape (Nsamples,)
   Heff2_samples = dt * dt * (classical_energy**2 + h * ZZX + h * XZZ + h**2 * XX)
-  Heff2_samples[boundary_ind[0]] *= 0.5
-  Heff2_samples[boundary_ind[1]] *= 0.5
+  Heff2_samples[bind0] *= 0.5
+  Heff2_samples[bindT] *= 0.5
 
   Heff_vmc = [Heff0_samples.mean(), Heff1_samples.mean(), Heff2_samples.mean()]
   Heff_std = [[Heff0_samples.real.std(), Heff0_samples.imag.std()],
@@ -74,7 +83,10 @@ def vmc_energy(machine, configs, times, dt, h=0.5):
   return Heff_vmc, Heff_std, Heff_samples
 
 
-def vmc_gradients(machine, configs, times, dt, h=0.5):
+def gradient(machine: base.BaseMachine, configs: np.ndarray, times: np.ndarray,
+             dt: float, h: float = 0.5
+             ) -> Tuple[np.ndarray, np.ndarray, float,
+                        List[float], List[float]]:
   """Calculates gradients using samples.
 
   Assumes that the machine has the same form at each time step, that is we
@@ -96,8 +108,8 @@ def vmc_gradients(machine, configs, times, dt, h=0.5):
     Heff_vmc: List with the average three terms of the Clock Hamiltonian.
     Heff_std: List with the STDs of the three terms of the Clock Hamiltonian.
   """
-  ## Heff_samples has shape (Nsamples,)
-  Heff_vmc, Heff_std, Heff_samples = vmc_energy(machine, configs, times, dt, h=h)
+  # Heff_samples has shape (Nsamples,)
+  Heff_vmc, Heff_std, Heff_samples = energy(machine, configs, times, dt, h=h)
 
   # shape (Nsamples, Nstates)
   grad_samples = machine.gradient(configs, times)

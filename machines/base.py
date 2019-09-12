@@ -1,13 +1,16 @@
 """Base machine to be used for sampling calculations.
 
 All machines should inherit this.
+Machines are used when optimizing with sampling.
 """
+import numpy as np
+from typing import Callable
 
 
 class BaseMachine:
   """Base machine to use with Clock optimization."""
 
-  def __init__(self, n_sites, time_steps):
+  def __init__(self, n_sites: int, time_steps: int):
     # Time steps do not include initial condition
     # __init__ should define the following attributes
     self.n_sites = n_sites
@@ -16,7 +19,8 @@ class BaseMachine:
     self.shape = None # Shape of the variational parameters
     self.name = None # Name (str) of the machine for saving purposes
 
-  def dense(self):
+  @property
+  def dense(self) -> np.ndarray:
     """Calculates the dense (full wavefunction) form of the machine.
 
     This is used because the C++ sampler currently only supports full
@@ -27,7 +31,21 @@ class BaseMachine:
     """
     raise NotImplementedError
 
-  def wavefunction(self, configs, times):
+  @property
+  def deterministic_gradient_func(self) -> Callable:
+    """Machine's deterministic gradient calculation function.
+
+    This is used because not all machines are compatible with all gradient
+    functions. For example MPS machines are not compatible with
+    `deterministic.gradient` but instead should use
+    `deterministic.sampling_gradient`.
+
+    Returns:
+      One of the functions defined in `optimization.determinstic`.
+    """
+    raise NotImplementedError
+
+  def wavefunction(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
     """Calculates wavefunction value on given samples.
 
     For each time we have to calculate the wavefunction for the previous and
@@ -42,7 +60,7 @@ class BaseMachine:
     """
     raise NotImplementedError
 
-  def gradient(self, configs, times):
+  def gradient(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
     """Calculates gradient value on given samples.
 
     Args:
@@ -54,38 +72,10 @@ class BaseMachine:
     """
     raise NotImplementedError
 
-  def update(self, to_add):
+  def update(self, to_add: np.ndarray) -> np.ndarray:
     """Updates variational parameters.
 
     Args:
       to_add: Value to add to the variational parameters.
-    """
-    raise NotImplementedError
-
-
-class BaseStepMachine(BaseMachine):
-  """Base machine to use with traditional t-VMC.
-
-  Note that no machine inherits this class. It is only used for documentation
-  purposes.
-
-  Most methods are the same as above with the following diferences:
-    `dense` returns shape (2^N).
-    `wavefunction` takes only `configs` (not `times`) and
-      returns shape (Ns,).
-    `gradient` takes only `configs` (not `times`).
-  """
-
-  def __init__(self, n_sites):
-    # __init__ should define the following attributes
-    self.n_sites = n_sites
-    self.dtype = None # Type of the variational parameters
-    self.shape = None # Shape of the variational parameters
-    self.name = None # Name (str) of the machine for saving purposes
-
-  def update(self, s_matrix, f_vector):
-    """Evolves variational parameters one time step.
-
-    Uses Runge-Kutta integration.
     """
     raise NotImplementedError
