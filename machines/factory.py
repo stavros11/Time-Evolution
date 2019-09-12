@@ -1,6 +1,6 @@
 """Import all implemented machines here to make them accessible to scripts."""
 
-from machines.full import FullWavefunctionMachine
-from machines.full import FullWavefunctionMachineNormalized
-from machines.mps import SmallMPSMachine
-from machines.mps import SmallMPSMachineNorm
+from machines.full import FullWavefunction
+from machines.full import FullWavefunctionNormalized
+from machines.mps import SmallMPS
+from machines.mps import SmallMPSNormalized

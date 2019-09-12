@@ -6,7 +6,7 @@ from optimization import deterministic
 from typing import Callable
 
 
-class FullWavefunctionMachine(base.BaseMachine):
+class FullWavefunction(base.BaseMachine):
 
   def __init__(self, init_state: np.ndarray, time_steps: int):
     self.n_states = len(init_state)
@@ -59,7 +59,7 @@ class FullWavefunctionMachine(base.BaseMachine):
     self.psi[1:] += to_add
 
 
-class FullWavefunctionMachineNormalized(FullWavefunctionMachine):
+class FullWavefunctionNormalized(FullWavefunction):
 
   def __init__(self, init_state: np.ndarray, time_steps: int):
     super().__init__(init_state, time_steps)

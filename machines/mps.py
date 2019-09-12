@@ -7,7 +7,7 @@ from utils.mps import mps as utils
 from typing import Callable, Tuple
 
 
-class SmallMPSMachine(base.BaseMachine):
+class SmallMPS(base.BaseMachine):
   """MPS machine for small systems - uses dense wavefunctions."""
 
   def __init__(self, init_state: np.ndarray, time_steps: int, d_bond: int,
@@ -164,7 +164,7 @@ class SmallMPSMachine(base.BaseMachine):
     self._dense = self._create_envs()
 
 
-class SmallMPSMachineNorm(SmallMPSMachine):
+class SmallMPSNormalized(SmallMPS):
   """Normalizes the wavefunction by dividing every MPS tensor with the norm.
 
   Norm calculation is tractable only for small systems.
@@ -188,7 +188,7 @@ class SmallMPSMachineNorm(SmallMPSMachine):
     self._dense *= 1.0 / norms[self.dense_slicer]
 
 
-class SmallMPSMachineCanonical(SmallMPSMachine):
+class SmallMPSCanonical(SmallMPS):
   """Normalizes the wavefunction by turning MPS to canonical form.
 
   DOES NOT WORK PROPERLY.
