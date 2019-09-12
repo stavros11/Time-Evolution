@@ -4,7 +4,7 @@ from machines.full import FullWavefunctionMachine
 from machines.full import FullWavefunctionMachineNormalized
 from machines.mps import SmallMPSMachine
 from machines.mps import SmallMPSMachineNorm
-from energy import deterministic
+from optimization import deterministic
 
 # Maps each machine to the appropriate deterministic gradient
 # calculation method

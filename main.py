@@ -5,15 +5,17 @@ Uses sampling to calculate gradients.
 import argparse
 import functools
 import numpy as np
-import optimization
-from energy import deterministic
-from energy import sampling
+from optimization import deterministic
+from optimization import optimize
+from optimization import sampling
 from machines import factory
 from samplers import samplers
 from utils import optimizers
 from utils import saving
 from utils import tfim
 from typing import Optional
+
+# TODO: Update README
 
 
 parser = argparse.ArgumentParser()
@@ -132,7 +134,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
                                                 ham2=ham2)
 
   # Optimize
-  history, machine = optimization.globally(**opt_params)
+  history, machine = optimize.globally(**opt_params)
 
   # Save training histories and final wavefunction
   filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
