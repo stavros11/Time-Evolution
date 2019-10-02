@@ -163,6 +163,16 @@ class SmallMPS(base.BaseMachine):
     self.tensors[1:] += to_add
     self._dense = self._create_envs()
 
+  def update_time_step(self, new: np.ndarray, time_step: np.ndarray):
+    # Assume that dense is a dense form and NOT an MPS in order to use
+    # the `ExactGMResSweep` sweeper as it is for the full wavefunction
+    new_mps = utils.dense_to_mps(new, self.d_bond)
+    self.tensors[time_step] = new_mps.swapaxes(1, 2)
+    # TODO: This call can be optimized as we can only recalculate the `envs`
+    # of the time step that we updated, while `_create_envs()` recalculates
+    # all environments as it was designed for global optimization
+    self._dense = self._create_envs()
+
 
 class SmallMPSNormalized(SmallMPS):
   """Normalizes the wavefunction by dividing every MPS tensor with the norm.

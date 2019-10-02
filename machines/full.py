@@ -58,6 +58,9 @@ class FullWavefunction(base.BaseMachine):
   def update(self, to_add: np.ndarray):
     self.psi[1:] += to_add
 
+  def update_time_step(self, new: np.ndarray, time_step: np.ndarray):
+    self.psi[time_step] = new.reshape(self.psi.shape[1:])
+
 
 class FullWavefunctionNormalized(FullWavefunction):
 

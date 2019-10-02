@@ -72,10 +72,19 @@ class BaseMachine:
     """
     raise NotImplementedError
 
-  def update(self, to_add: np.ndarray) -> np.ndarray:
+  def update(self, to_add: np.ndarray):
     """Updates variational parameters.
 
     Args:
       to_add: Value to add to the variational parameters.
+    """
+    raise NotImplementedError
+
+  def update_time_step(self, new: np.ndarray, time_step: int):
+    """Updates variational parameters at a single time step.
+
+    Args:
+      new: New values of the variational parameters.
+      time_step: Time step to update.
     """
     raise NotImplementedError

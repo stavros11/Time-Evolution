@@ -1,5 +1,6 @@
 import numpy as np
 from machines import base
+from optimization import sweeping
 from samplers import samplers
 from utils import calc
 from utils import optimizers
@@ -23,7 +24,8 @@ def globally(exact_state: np.ndarray,
              ) -> Tuple[Dict[str, List[float]], base.BaseMachine]:
   """Optimizes the Clock Hamiltonian for a machine globally.
 
-  Globally means that all time steps are optimized in a single step.
+  Globally means that all time steps are optimized in a single optimziation
+  step.
 
   Args:
     exact_state: Exact state evolution with shape (T + 1, 2^N).
@@ -92,3 +94,59 @@ def globally(exact_state: np.ndarray,
         print("{}: {}".format(k, val[-1]))
 
   return history, machine
+
+
+def sweep(exact_state: np.ndarray,
+          machine: base.BaseMachine,
+          sweeper: sweeping.Base,
+          n_epochs: int,
+          detenergy_func: Optional[Callable[[np.ndarray], float]] = None,
+          both_directions: bool = True,
+          n_message: Optional[int] = None
+          ) -> Tuple[Dict[str, List[float]], base.BaseMachine]:
+  """Optimizes the Clock Hamiltonian for a machine by sweeping through time.
+
+  Args:
+    exact_state: Exact state evolution with shape (T + 1, 2^N).
+    machine: Machine object to optimize.
+    sweeper: Class that implements the sweeping algorithm.
+      This class should be callable (should have `__call__` implemented)
+      and should take the `machine` and the time step as integer and return
+      the machine after optimizing it for `t=time_step`.
+    n_epochs: Total number of full sweeps. A full sweep optiizes all time steps,
+      that is from t=1 to t=T or reverse.
+    detenergy_func: Function that calculates deterministic energy.
+      This is used for history only - not optimization.
+    both_directions: If True the sweeping is performed back and forth.
+      All odd sweeps are 1->T and even sweeps are T-->1.
+      If False then all sweeps are 1->T.
+    n_message: Every how many epochs to print messages during optimization.
+      If `None` no messages are printed.
+
+  Returns:
+    history: Dictionary with the history of quantities we track during training.
+      See definition of `history` in method for a list of tracked quantities.
+    machine. Machine object after its optimization is completed.
+  """
+  history = {"overlaps" : [], "avg_overlaps": [], "exact_Eloc": []}
+  for epoch in range(n_epochs):
+    machine = sweeper(machine)
+    if both_directions:
+      sweeper.switch_direction()
+
+    # Calculate histories
+    full_psi = machine.dense
+    history["overlaps"].append(calc.overlap(full_psi, exact_state))
+    history["avg_overlaps"].append(calc.averaged_overlap(full_psi, exact_state))
+    exact_Eloc, _ = detenergy_func(full_psi)
+    history["exact_Eloc"].append(np.array(exact_Eloc).sum())
+
+    # Print messages
+    if n_message is not None and epoch % n_message == 0:
+      print("\nSweep {}".format(epoch))
+      for k, val in history.items():
+        print("{}: {}".format(k, val[-1]))
+
+  return history, machine
+
+
