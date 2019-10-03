@@ -46,7 +46,7 @@ class ExactGMResSweep(Base):
     identity = np.eye(ham.shape[0], dtype=dtham.dtype)
     # Calculate A matrix
     # multiply by 2 so that you don't have to divide the alpha ket
-    self.alpha_mat = 2.0 * identity + dt**2 * ham.dot(ham)
+    self.alpha_mat = identity + dt**2 * ham.dot(ham) / 2.0
     # Calculate expanded "unitary"
     self.exp_u1 = identity - dtham
     self.exp_u1d = identity + dtham
@@ -63,7 +63,6 @@ class ExactGMResSweep(Base):
     sweeper = cls(ham, dt, maxiter)
     if one_term_mode:
       sweeper.single_step = sweeper.single_step_oneterm
-      sweeper.alpha_mat *= 0.5
     else:
       sweeper.single_step = sweeper.single_step_twoterms
     return sweeper
@@ -80,7 +79,7 @@ class ExactGMResSweep(Base):
     alpha_vec = self.exp_u1.dot(full_psi[time_step - 1])
     if time_step < len(full_psi) - 1:
       alpha_vec += self.exp_u1d.dot(full_psi[time_step + 1])
-    # Solve Ax = a/2
+      alpha_vec *= 0.5
     new_psi, _ = linalg.gmres(self.alpha_mat, alpha_vec,
                               x0=full_psi[time_step],
                               maxiter=self.maxiter)
@@ -99,7 +98,6 @@ class ExactGMResSweep(Base):
         raise ValueError("Cannot perform backward update for the final "
                          "time step.")
       alpha_vec = self.exp_u1d.dot(full_psi[time_step + 1])
-    # Solve Ax = a/2
     new_psi, _ = linalg.gmres(self.alpha_mat, alpha_vec,
                               x0=full_psi[time_step],
                               maxiter=self.maxiter)
