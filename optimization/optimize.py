@@ -68,12 +68,17 @@ def globally(exact_state: np.ndarray,
       Ok, Ok_star_Eloc, Eloc, _, _ = grad_func(machine, configs, times)
 
     # Calculate gradients
-    grad = Ok_star_Eloc - Ok.conj() * Eloc
-    if grad.shape[1:] != machine.shape[1:]:
-      grad = grad.reshape((time_steps,) + machine.shape[1:])
+    if Ok_star_Eloc is None:
+      # then we are using an autograd machine
+      grad = Ok
+    else:
+      grad = Ok_star_Eloc - Ok.conj() * Eloc
+      if grad.shape[1:] != machine.shape[1:]:
+        grad = grad.reshape((time_steps,) + machine.shape[1:])
+      grad = optimizer(grad, epoch)
 
     # Update machine
-    machine.update(optimizer(grad, epoch))
+    machine.update(grad)
 
     # Calculate histories
     full_psi = machine.dense
@@ -148,5 +153,3 @@ def sweep(exact_state: np.ndarray,
         print("{}: {}".format(k, val[-1]))
 
   return history, machine
-
-
