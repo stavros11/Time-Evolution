@@ -7,16 +7,27 @@ Obviously for this to work, the ansatz has to have explicit time dependence.
 import numpy as np
 from scipy.sparse import linalg
 from machines import base
-from typing import Optional
+from utils import optimizers
+from typing import Optional, Tuple
 
 
 class Base:
 
   def __init__(self):
+    # Flag that keeps track of whether we are sweeping forward (1->T) or
+    # backward (T->1).
+    self.going_forward = True
     raise NotImplementedError
 
-  def __call__(self, machine: base.BaseMachine, time_step: int
-               ) -> base.BaseMachine:
+  def switch_direction(self):
+    """Switches direction of sweep (in time)."""
+    self.going_forward = not(self.going_forward)
+
+  def single_step(self, machine: base.BaseMachine, time_step: int
+                  ) -> base.BaseMachine:
+    raise NotImplementedError
+
+  def __call__(self, machine: base.BaseMachine) -> base.BaseMachine:
     """Updates the ansatz at a single time step.
 
     Args:
@@ -26,7 +37,13 @@ class Base:
     Returns:
       The machine after the update.
     """
-    raise NotImplementedError
+    if self.going_forward:
+      for time_step in range(1, machine.time_steps + 1):
+        machine = self.single_step(machine, time_step)
+    else:
+      for time_step in range(machine.time_steps - 1, 0, -1):
+        machine = self.single_step(machine, time_step)
+    return machine
 
 
 class ExactGMResSweep(Base):
@@ -67,11 +84,6 @@ class ExactGMResSweep(Base):
       sweeper.single_step = sweeper.single_step_twoterms
     return sweeper
 
-  def switch_direction(self):
-    """Switches direction of sweep (in time)."""
-    # TODO: Move this in `Base`.
-    self.going_forward = not(self.going_forward)
-
   def single_step_twoterms(self, machine: base.BaseMachine, time_step: int
                            ) -> base.BaseMachine:
     full_psi = machine.dense
@@ -105,11 +117,56 @@ class ExactGMResSweep(Base):
     machine.update_time_step(new_psi, time_step)
     return machine
 
-  def __call__(self, machine: base.BaseMachine) -> base.BaseMachine:
+
+class NormalizedSweep(Base):
+
+  def __init__(self, ham: np.ndarray, dt: float, epsilon: float = 1e-6,
+               optimizer: Optional[optimizers.BaseOptimizer] = None):
+    self.going_forward = True
+    dtham = 1j * dt * ham
+    identity = np.eye(ham.shape[0], dtype=dtham.dtype)
+    # Calculate A matrix
+    # multiply by 2 so that you don't have to divide the alpha ket
+    self.alpha_mat = identity + dt**2 * ham.dot(ham) / 2.0
+    # Calculate expanded "unitary"
+    self.exp_u1 = identity - dtham
+    self.exp_u1d = identity + dtham
+    self.epsilon = epsilon
+    self.optimizer = optimizer
+
+  def optimization_step(self, psi_t: np.ndarray, u_psi_prev: np.ndarray,
+                        epoch: int) -> Tuple[np.ndarray, float]:
+    norm_t = (np.abs(psi_t)**2).sum()
+    alpha_psi_t = self.alpha_mat.dot(psi_t)
+
+    energy_t = (psi_t.conj().dot(alpha_psi_t) -
+                2 * psi_t.conj().dot(u_psi_prev).real) / norm_t
+    grad = (alpha_psi_t - u_psi_prev - energy_t * psi_t) / norm_t
+
+    psi_t = psi_t + self.optimizer(grad, epoch)
+    return psi_t, energy_t.real
+
+  def single_step(self, machine: base.BaseMachine, time_step: int
+                  ) -> base.BaseMachine:
+    full_psi = machine.dense
+    psi_t = np.copy(full_psi[time_step])
+    if self.optimizer is None:
+      self.optimizer = optimizers.AdamComplex(psi_t.shape, psi_t.dtype)
+
     if self.going_forward:
-      for time_step in range(1, machine.time_steps + 1):
-        machine = self.single_step(machine, time_step)
+      u_psi_prev = self.exp_u1.dot(full_psi[time_step - 1])
     else:
-      for time_step in range(machine.time_steps - 1, 0, -1):
-        machine = self.single_step(machine, time_step)
+      u_psi_prev = self.exp_u1d.dot(full_psi[time_step + 1])
+
+    epoch, previous_energy = 0, 1e5
+    psi_t, current_energy = self.optimization_step(psi_t, u_psi_prev, epoch)
+    rel_error = np.abs((previous_energy - current_energy) / current_energy)
+    #while rel_error > self.epsilon:
+    for _ in range(100):
+      epoch += 1
+      previous_energy = current_energy
+      psi_t, current_energy = self.optimization_step(psi_t, u_psi_prev, epoch)
+      rel_error = np.abs((previous_energy - current_energy) / current_energy)
+
+    machine.update_time_step(psi_t, time_step)
     return machine

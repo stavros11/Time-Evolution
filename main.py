@@ -8,6 +8,7 @@ import numpy as np
 from optimization import deterministic
 from optimization import optimize
 from optimization import sampling
+from optimization import sweeping
 from machines import factory
 from samplers import samplers
 from utils import optimizers
@@ -54,9 +55,12 @@ parser.add_argument("--n-message", default=500, type=int,
 parser.add_argument("--sweep-opt", action="store_true",
                     help="Optimize by sweeping through time.")
 parser.add_argument("--sweep-both-directions", action="store_true",
-                    help="Optimize by sweeping through time.")
+                    help="Optimize by sweeping back and forth.")
 parser.add_argument("--sweep-with-one-term", action="store_true",
-                    help="Optimize by sweeping through time.")
+                    help="Optimize by sweeping using only terms at previous times.")
+parser.add_argument("--sweep-normalized", action="store_true",
+                    help="Optimize by sweeping using normalized loss.")
+# Currently normalized sweeps are implemented only with previous time terms
 
 # Sampling params
 parser.add_argument("--n-samples", default=0, type=int,
@@ -85,6 +89,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          sweep_opt: bool = False,
          sweep_both_directions: bool = True,
          sweep_with_one_term: bool = False,
+         sweep_normalized: bool = False,
          learning_rate: Optional[float] = None,
          n_message: Optional[int] = None,
          h_init: Optional[float] = None,
@@ -123,30 +128,36 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   machine = getattr(factory, machine_type)(exact_state[0], time_steps,
                     **machine_params)
 
+  # Set optimizer
+  optimizer = None
+  if learning_rate is not None:
+    optimizer = optimizers.AdamComplex(machine.shape, dtype=machine.dtype,
+                                       alpha=learning_rate)
+
   ham2 = ham.dot(ham)
   opt_params = {"exact_state": exact_state, "machine": machine,
                 "n_epochs": n_epochs, "n_message": n_message}
   if sweep_opt:
     opt_params["both_directions"] = sweep_both_directions
-    sweeper_type = factory.machine_to_sweeper[machine_type]
-    # TODO: Add `maxiter` flag
-    opt_params["sweeper"] = sweeper_type.initialize(ham, dt,
-              one_term_mode=sweep_with_one_term)
     opt_params["detenergy_func"] = functools.partial(deterministic.energy,
                                                      ham=ham, dt=dt,
                                                      ham2=ham2)
+
+    if sweep_normalized:
+      opt_params["sweeper"] = sweeping.NormalizedSweep(ham, dt, epsilon=1e-3,
+                optimizer=optimizer)
+      # TODO: Add `epsilon` flag
+    else:
+      sweeper_type = factory.machine_to_sweeper[machine_type]
+      # TODO: Add `maxiter` flag
+      opt_params["sweeper"] = sweeper_type.initialize(ham, dt,
+                one_term_mode=sweep_with_one_term)
+
     # Optimize
     history, machine = optimize.sweep(**opt_params)
 
   else:
-    # Set optimizer
-    optimizer = None
-    if learning_rate is not None:
-      optimizer = optimizers.AdamComplex(machine.shape, dtype=machine.dtype,
-                                         alpha=learning_rate)
-
-      opt_params["optimizer"] = optimizer
-
+    opt_params["optimizer"] = optimizer
     # Set gradient and deterministic energy calculation functions
     if n_samples > 0:
       opt_params["grad_func"] = functools.partial(sampling.gradient,
