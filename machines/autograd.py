@@ -11,7 +11,7 @@ from typing import List, Optional
 
 class BaseAutoGrad:
 
-  def __init__(self, model_norm: tf.keras.Model, model_phase: tf.keras.Model,
+  def __init__(self, model_real: tf.keras.Model, model_imag: tf.keras.Model,
                n_sites: int, time_steps: int, use_mask: bool = False,
                name: Optional[str] = None,
                optimizer: Optional[tf.train.Optimizer] = None):
@@ -36,11 +36,11 @@ class BaseAutoGrad:
     else:
       self.name = name
 
-    self.norm, self.phase = model_norm, model_phase
-    self.input_type = model_norm.input.dtype
-    input_shape = model_norm.input.shape[-1]
-    self.variables = (model_norm.trainable_variables +
-                      model_phase.trainable_variables)
+    self.real, self.imag = model_real, model_imag
+    self.input_type = model_real.input.dtype
+    input_shape = model_real.input.shape[-1]
+    self.variables = (model_real.trainable_variables +
+                      model_imag.trainable_variables)
 
     self._dense = None
     self.dense_shape = (time_steps + 1, 2**n_sites)
@@ -61,7 +61,8 @@ class BaseAutoGrad:
                        "for given sites and time steps".format(input_shape))
 
     # Mask only used for `fullwv_model` for sanity check
-    if use_mask:
+    assert self.real.use_mask == self.imag.use_mask
+    if self.real.use_mask:
       n_states = 2**n_sites
       grad_mask = np.ones(n_states * (time_steps + 1))
       grad_mask[:n_states] = 0
@@ -101,9 +102,8 @@ class BaseAutoGrad:
     configs_tf = tf.cast(configs, dtype=self.input_type)
     times_tf = self.cast_time(times)
     inputs = tf.concat([configs_tf, times_tf], axis=1)
-    norm = self.norm(inputs)
-    phase = 2 * np.pi * self.phase(inputs)
-    psi = tf.complex(norm * tf.cos(phase), norm * tf.sin(phase))
+    real, imag = self.real(inputs), self.imag(inputs)
+    psi = tf.complex(real, imag)
 
     self._dense = psi.numpy().reshape(self.dense_shape)
     return psi
@@ -132,14 +132,17 @@ def feed_forward_network(n_input: int, n_output: int = 1) -> tf.keras.Model:
   model.add(layers.Dense(10, activation="relu"))
   model.add(layers.Dense(10, activation="relu"))
   model.add(layers.Dense(n_output, activation="sigmoid"))
+  # Add an attribute that tells to the machine whether to use mask for to
+  # keep the initial condition constant during optimization
+  model.use_mask = False
   return model
 
 
-def fullwv_model(init_wavefunction, dtype=tf.float32) -> tf.keras.Model:
+def fullwv_model(init_wavefunction: np.ndarray, dtype=tf.float32) -> tf.keras.Model:
   n_states = init_wavefunction.shape[-1]
   n_sites = int(np.log2(n_states))
-  to_binary = tf.cast(2**np.arange(n_sites - 1, -1, -1)[:, np.newaxis],
-                      dtype=dtype)
+  to_binary = 2**np.arange(n_sites - 1, -1, -1)[:, np.newaxis]
+  to_binary = tf.convert_to_tensor(to_binary, dtype=dtype)
 
   class FullWVLayer(layers.Layer):
 
@@ -156,6 +159,9 @@ def fullwv_model(init_wavefunction, dtype=tf.float32) -> tf.keras.Model:
       return tf.gather(self.psi, indices)
 
   model = tf.keras.models.Sequential()
-  model.add(layers.Input(n_sites + 1))
+  model.add(layers.Input(n_sites + 1, dtype=dtype))
   model.add(FullWVLayer(init_wavefunction, dtype))
+  # Add an attribute that tells to the machine whether to use mask for to
+  # keep the initial condition constant during optimization
+  model.use_mask = True
   return model

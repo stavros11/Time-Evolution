@@ -65,7 +65,7 @@ def gradient(machine: autograd.BaseAutoGrad,
              ham2: Optional[tf.Tensor] = None
              ) -> Tuple[List[tf.Tensor], None, np.ndarray, None]:
   n_sites, time_steps = machine.n_sites, machine.time_steps
-  all_configs = np.array(list(itertools.product([1, -1], repeat=n_sites)))
+  all_configs = np.array(list(itertools.product([-1, 1], repeat=n_sites)))
   n_states = len(all_configs)
 
   times = np.repeat(np.arange(time_steps + 1), n_states)

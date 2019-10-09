@@ -95,9 +95,9 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
 
   # Set machine
   init_wavefunction = np.array((time_steps + 1) * [exact_state[0]])
-  model_norm = autograd.fullwv_model(init_wavefunction)
-  model_phase = autograd.fullwv_model(init_wavefunction)
-  machine = autograd.BaseAutoGrad(model_norm, model_phase,
+  model_real = autograd.fullwv_model(init_wavefunction.real, dtype=tf.float64)
+  model_imag = autograd.fullwv_model(init_wavefunction.imag, dtype=tf.float64)
+  machine = autograd.BaseAutoGrad(model_real, model_imag,
                                   n_sites=n_sites, time_steps=time_steps,
                                   name="keras_fullwv",
                                   optimizer=optimizer)
