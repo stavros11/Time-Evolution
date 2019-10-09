@@ -73,8 +73,7 @@ def gradient(machine: autograd.BaseAutoGrad,
 
   with tf.GradientTape() as tape:
     tape.watch(machine.variables)
-    full_psi = tf.reshape(machine.wavefunction(configs, times),
-                          machine.dense_shape)
+    full_psi = machine.wavefunction(configs, times)
     heff_ev = energy(full_psi, ham, dt, ham2)
 
   grad = tape.gradient(heff_ev, machine.variables)

@@ -94,11 +94,14 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
   # Set machine
-  init_wavefunction = np.array((time_steps + 1) * [exact_state[0]])
-  model_real = autograd.fullwv_model(init_wavefunction.real, dtype=tf.float64)
-  model_imag = autograd.fullwv_model(init_wavefunction.imag, dtype=tf.float64)
+  #init_wavefunction = np.array((time_steps + 1) * [exact_state[0]])
+  #model_real = autograd.fullwv_model(init_wavefunction.real, dtype=tf.float64)
+  #model_imag = autograd.fullwv_model(init_wavefunction.imag, dtype=tf.float64)
+  model_real = autograd.feed_forward_model(n_sites + 1, dtype=tf.float64)
+  model_imag = autograd.feed_forward_model(n_sites + 1, dtype=tf.float64)
   machine = autograd.BaseAutoGrad(model_real, model_imag,
                                   n_sites=n_sites, time_steps=time_steps,
+                                  init_state=exact_state[0],
                                   name="keras_fullwv",
                                   optimizer=optimizer)
 

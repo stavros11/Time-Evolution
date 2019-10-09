@@ -12,7 +12,7 @@ from typing import List, Optional
 class BaseAutoGrad:
 
   def __init__(self, model_real: tf.keras.Model, model_imag: tf.keras.Model,
-               n_sites: int, time_steps: int, use_mask: bool = False,
+               n_sites: int, time_steps: int, init_state: np.ndarray,
                name: Optional[str] = None,
                optimizer: Optional[tf.train.Optimizer] = None):
     """Constructs machine given a keras model.
@@ -61,14 +61,7 @@ class BaseAutoGrad:
                        "for given sites and time steps".format(input_shape))
 
     # Mask only used for `fullwv_model` for sanity check
-    assert self.real.use_mask == self.imag.use_mask
-    if self.real.use_mask:
-      n_states = 2**n_sites
-      grad_mask = np.ones(n_states * (time_steps + 1))
-      grad_mask[:n_states] = 0
-      self.grad_mask = tf.cast(grad_mask, dtype=self.input_type)
-    else:
-      self.grad_mask = None
+    self.init_state = tf.cast(init_state[np.newaxis], dtype=self.output_type)
 
   @property
   def dense(self) -> np.ndarray:
@@ -89,21 +82,23 @@ class BaseAutoGrad:
   def wavefunction(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
     """Calculates wavefunction value on given samples.
 
-    For each time we have to calculate the wavefunction for the previous and
-    next time step to calculate all energy terms!
+    Note that currently this works only if configs and times are all the
+    possible (exponentially many) states, to avoid using `where` in TensorFlow.
+    We need to fix this if we want to use this with sampling.
 
     Args:
       configs: Spin configuration samples of shape (Ns, N)
       times: Time configuration samples of shape (Ns,)
 
     Returns:
-      dense wavefunction of shape (Ns,)
+      dense wavefunction of shape (T + 1, 2^N)
     """
     configs_tf = tf.cast(configs, dtype=self.input_type)
     times_tf = self.cast_time(times)
     inputs = tf.concat([configs_tf, times_tf], axis=1)
     real, imag = self.real(inputs), self.imag(inputs)
-    psi = tf.complex(real, imag)
+    psi_ev = tf.reshape(tf.complex(real, imag), self.dense_shape)
+    psi = tf.concat([self.init_state, psi_ev[1:]], axis=0)
 
     self._dense = psi.numpy().reshape(self.dense_shape)
     return psi
@@ -113,28 +108,20 @@ class BaseAutoGrad:
                               "machines.")
 
   def update(self, grads: List[tf.Tensor]):
-    if self.grad_mask is None:
-      masked_grads = grads
-    else:
-      masked_grads = [g * self.grad_mask for g in grads]
-    self.optimizer.apply_gradients(zip(masked_grads, self.variables))
+    self.optimizer.apply_gradients(zip(grads, self.variables))
 
   def update_time_step(self, new: np.ndarray, time_step: int):
     raise NotImplementedError("Step update is not supported in AutoGrad "
                               "machines.")
 
 
-def feed_forward_network(n_input: int, n_output: int = 1) -> tf.keras.Model:
+def feed_forward_model(n_input: int, n_output: int = 1, dtype=tf.float32) -> tf.keras.Model:
   """Simple feed forward keras model."""
   model = tf.keras.models.Sequential()
-  model.add(layers.Input(n_input))
-  model.add(layers.Dense(20, activation="relu"))
-  model.add(layers.Dense(10, activation="relu"))
-  model.add(layers.Dense(10, activation="relu"))
-  model.add(layers.Dense(n_output, activation="sigmoid"))
-  # Add an attribute that tells to the machine whether to use mask for to
-  # keep the initial condition constant during optimization
-  model.use_mask = False
+  model.add(layers.Input(n_input, dtype=dtype))
+  model.add(layers.Dense(20, activation="relu", dtype=dtype))
+  model.add(layers.Dense(20, activation="relu", dtype=dtype))
+  model.add(layers.Dense(n_output, activation="sigmoid", dtype=dtype))
   return model
 
 
@@ -161,7 +148,4 @@ def fullwv_model(init_wavefunction: np.ndarray, dtype=tf.float32) -> tf.keras.Mo
   model = tf.keras.models.Sequential()
   model.add(layers.Input(n_sites + 1, dtype=dtype))
   model.add(FullWVLayer(init_wavefunction, dtype))
-  # Add an attribute that tells to the machine whether to use mask for to
-  # keep the initial condition constant during optimization
-  model.use_mask = True
   return model
