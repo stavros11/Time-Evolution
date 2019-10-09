@@ -93,6 +93,8 @@ class BaseAutoGrad:
     Returns:
       dense wavefunction of shape (T + 1, 2^N)
     """
+    # TODO: Add a flag in `model` to select one-hot encoding for time
+    # and apply this here
     configs_tf = tf.cast(configs, dtype=self.input_type)
     times_tf = self.cast_time(times)
     inputs = tf.concat([configs_tf, times_tf], axis=1)

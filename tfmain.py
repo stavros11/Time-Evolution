@@ -102,7 +102,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   machine = autograd.BaseAutoGrad(model_real, model_imag,
                                   n_sites=n_sites, time_steps=time_steps,
                                   init_state=exact_state[0],
-                                  name="keras_fullwv",
+                                  name="keras_feed_forward",
                                   optimizer=optimizer)
 
   ham = tfim.tfim_hamiltonian(n_sites, h=h_ev, pbc=True)
