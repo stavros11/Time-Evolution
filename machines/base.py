@@ -4,7 +4,6 @@ All machines should inherit this.
 Machines are used when optimizing with sampling.
 """
 import numpy as np
-from typing import Callable
 
 
 class BaseMachine:
@@ -28,20 +27,6 @@ class BaseMachine:
 
     Returns:
       dense form of the wavefunction with shape (M+1, Ns)
-    """
-    raise NotImplementedError
-
-  @property
-  def deterministic_gradient_func(self) -> Callable:
-    """Machine's deterministic gradient calculation function.
-
-    This is used because not all machines are compatible with all gradient
-    functions. For example MPS machines are not compatible with
-    `deterministic.gradient` but instead should use
-    `deterministic.sampling_gradient`.
-
-    Returns:
-      One of the functions defined in `optimization.determinstic`.
     """
     raise NotImplementedError
 

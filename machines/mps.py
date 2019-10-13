@@ -2,9 +2,8 @@
 
 import numpy as np
 from machines import base
-from optimization import deterministic
 from utils.mps import mps as utils
-from typing import Callable, Tuple
+from typing import Tuple
 
 
 class SmallMPS(base.BaseMachine):
@@ -29,10 +28,6 @@ class SmallMPS(base.BaseMachine):
   @property
   def dense(self) -> np.ndarray:
     return self._dense.reshape((self.time_steps + 1, self.n_states))
-
-  @property
-  def deterministic_gradient_func(self) -> Callable:
-    return deterministic.sampling_gradient
 
   def _vectorized_svd_split(self, m: np.ndarray
                             ) -> Tuple[np.ndarray, np.ndarray]:
