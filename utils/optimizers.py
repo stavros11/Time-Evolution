@@ -4,8 +4,9 @@ import numpy as np
 
 class BaseOptimizer:
 
-  def __init__(self):
-    pass
+  def __init__(self, shape, dtype):
+    self.shape = shape
+    self.dtype = dtype
 
   def __call__(self, gradient, epoch):
     raise NotImplementedError
@@ -16,6 +17,7 @@ class AdamComplex(BaseOptimizer):
 
   def __init__(self, shape, dtype, beta1=0.9, beta2=0.999, alpha=1e-3,
                epsilon=1e-8):
+    super(AdamComplex, self).__init__(shape, dtype)
     self.m = np.zeros(shape, dtype=dtype)
     self.v = np.zeros(shape, dtype=dtype)
     self.beta1, self.beta2 = beta1, beta2
