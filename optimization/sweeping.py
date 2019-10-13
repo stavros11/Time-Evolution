@@ -158,15 +158,13 @@ class NormalizedSweep(Base):
     else:
       u_psi_prev = self.exp_u1d.dot(full_psi[time_step + 1])
 
-    epoch, previous_energy = 0, 1e5
-    psi_t, current_energy = self.optimization_step(psi_t, u_psi_prev, epoch)
-    rel_error = np.abs((previous_energy - current_energy) / current_energy)
-    #while rel_error > self.epsilon:
-    for _ in range(100):
-      epoch += 1
-      previous_energy = current_energy
+    for epoch in range(10000):
       psi_t, current_energy = self.optimization_step(psi_t, u_psi_prev, epoch)
-      rel_error = np.abs((previous_energy - current_energy) / current_energy)
+      #rel_error = np.abs((previous_energy - current_energy) / current_energy)
+      if epoch % 2000 == 0:
+        print("\nEpoch: {}".format(epoch))
+        print("Energy(t): {}".format(current_energy))
 
+    print("\n")
     machine.update_time_step(psi_t, time_step)
     return machine
