@@ -58,6 +58,8 @@ parser.add_argument("--sweep-time-normalization", action="store_true",
                     help="Optimize by sweeping using normalized loss.")
 parser.add_argument("--sweep-global-normalization", action="store_true",
                     help="Optimize by sweeping using globally normalized loss.")
+parser.add_argument("--opt-steps-per-time", default=1000, type=int,
+                    help="Number of steps for local (in time) optimization.")
 parser.add_argument("--sweep-both-directions", action="store_true",
                     help="Optimize by sweeping back and forth.")
 parser.add_argument("--sweep-with-one-term", action="store_true",
@@ -92,6 +94,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          sweep_global_normalization: bool = False,
          sweep_no_normalization: bool = False,
          sweep_with_one_term: bool = False,
+         opt_steps_per_time: int = 1000,
          sweep_both_directions: bool = False,
          learning_rate: Optional[float] = None,
          n_message: Optional[int] = None,
@@ -180,6 +183,8 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
     gradient_func = factory.machine_to_gradient_func[machine_type]
     opt_params["grad_func"] = functools.partial(gradient_func,
               ham=ham, dt=dt, ham2=ham2)
+    opt_params["n_epochs"] *= opt_steps_per_time
+    opt_params["steps_per_time"] = opt_steps_per_time
     # TODO: We can implement sampler here but we do not use it anyway.
     history, machine = optimize.sweep_global_norm(**opt_params)
 

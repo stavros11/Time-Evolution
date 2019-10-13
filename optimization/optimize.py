@@ -153,6 +153,7 @@ def sweep(exact_state: np.ndarray,
 def sweep_global_norm(exact_state: np.ndarray,
                       machine: base.BaseMachine,
                       n_epochs: int,
+                      steps_per_time: int,
                       grad_func: Union[GradCalc, SamplingGradCalc],
                       sampler: Optional[samplers.Base] = None,
                       detenergy_func: Optional[Callable[[np.ndarray], float]] = None,
@@ -173,7 +174,7 @@ def sweep_global_norm(exact_state: np.ndarray,
   # Define a different optimizer for each time step
   optimizer_list = [optimizers.AdamComplex(machine.shape, dtype=machine.dtype)
                     for _ in range(time_steps)]
-  masked_optimizer = sweeping.masked_optimizer(optimizer_list)
+  masked_optimizer = sweeping.masked_optimizer(optimizer_list, steps_per_time)
 
   history = {"overlaps" : [], "avg_overlaps": [], "exact_Eloc": []}
   if sampler is not None:

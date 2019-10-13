@@ -12,7 +12,8 @@ from utils import optimizers
 from typing import Callable, List, Optional, Tuple
 
 
-def masked_optimizer(optimizer_list: List[optimizers.BaseOptimizer]
+def masked_optimizer(optimizer_list: List[optimizers.BaseOptimizer],
+                     optimization_steps_per_time: int
                      ) -> Callable[[np.ndarray, int], np.ndarray]:
   # TODO: Implement both ways sweeping
   shape, dtype = optimizer_list[0].shape, optimizer_list[1].dtype
@@ -20,16 +21,21 @@ def masked_optimizer(optimizer_list: List[optimizers.BaseOptimizer]
 
   mask = np.zeros(shape, dtype=dtype)
   current_time = 0 # ignores initial condition because masks and optimizers
+  mask[current_time] = np.ones(shape[1:], dtype=dtype)
+  optimizer = optimizer_list[current_time]
   # lists are numbered from 0.
+  opt_steps = 0
   while True:
-    mask[current_time] = np.ones(shape[1:], dtype=dtype)
-    optimizer = optimizer_list[current_time]
     yield lambda grad, epoch: optimizer(grad * mask, epoch)
-
-    mask[current_time] = np.zeros(shape[1:], dtype=dtype)
-    current_time += 1
-    if current_time == time_steps:
-      current_time = 0
+    opt_steps += 1
+    if opt_steps == optimization_steps_per_time:
+      mask[current_time] = np.zeros(shape[1:], dtype=dtype)
+      current_time += 1
+      if current_time == time_steps:
+        current_time = 0
+      mask[current_time] = np.ones(shape[1:], dtype=dtype)
+      optimizer = optimizer_list[current_time]
+      opt_steps = 0
 
 
 class Base:
