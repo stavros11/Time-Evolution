@@ -9,7 +9,27 @@ import numpy as np
 from scipy.sparse import linalg
 from machines import base
 from utils import optimizers
-from typing import Optional, Tuple
+from typing import Callable, List, Optional, Tuple
+
+
+def masked_optimizer(optimizer_list: List[optimizers.BaseOptimizer]
+                     ) -> Callable[[np.ndarray, int], np.ndarray]:
+  # TODO: Implement both ways sweeping
+  shape, dtype = optimizer_list[0].shape, optimizer_list[1].dtype
+  time_steps = len(optimizer_list)
+
+  mask = np.zeros(shape, dtype=dtype)
+  current_time = 0 # ignores initial condition because masks and optimizers
+  # lists are numbered from 0.
+  while True:
+    mask[current_time] = np.ones(shape[1:], dtype=dtype)
+    optimizer = optimizer_list[current_time]
+    yield lambda grad, epoch: optimizer(grad * mask, epoch)
+
+    mask[current_time] = np.zeros(shape[1:], dtype=dtype)
+    current_time += 1
+    if current_time == time_steps:
+      current_time = 0
 
 
 class Base:

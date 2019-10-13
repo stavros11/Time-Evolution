@@ -150,3 +150,69 @@ def sweep(exact_state: np.ndarray,
   return history, machine
 
 
+def sweep_global_norm(exact_state: np.ndarray,
+                      machine: base.BaseMachine,
+                      n_epochs: int,
+                      grad_func: Union[GradCalc, SamplingGradCalc],
+                      sampler: Optional[samplers.Base] = None,
+                      detenergy_func: Optional[Callable[[np.ndarray], float]] = None,
+                      optimizer: Optional[optimizers.BaseOptimizer] = None,
+                      n_message: Optional[int] = None
+                      ) -> Tuple[Dict[str, List[float]], base.BaseMachine]:
+  """Optimizes the Clock energy (correct normalization) by sweeping through time.
+
+  Copies the functionality of `global` optimization but masks the gradient
+  so that only one time step is updated at each epoch.
+  """
+  # FIXME: Code repetition from `global`.
+  # TODO: Allow user to give optimizer
+  time_steps = len(exact_state) - 1
+  if optimizer is not None:
+    raise NotImplementedError
+
+  # Define a different optimizer for each time step
+  optimizer_list = [optimizers.AdamComplex(machine.shape, dtype=machine.dtype)
+                    for _ in range(time_steps)]
+  masked_optimizer = sweeping.masked_optimizer(optimizer_list)
+
+  history = {"overlaps" : [], "avg_overlaps": [], "exact_Eloc": []}
+  if sampler is not None:
+    history["sampled_Eloc"] = []
+    if detenergy_func is None:
+      raise ValueError("Sampler was given but `detenergy_func` not.")
+
+  for epoch in range(n_epochs):
+    # Calculate VMC quantities with sampling or exactly
+    if sampler is None:
+      Ok, Ok_star_Eloc, Eloc, _ = grad_func(machine)
+    else:
+      configs, times = sampler(machine.dense)
+      Ok, Ok_star_Eloc, Eloc, _, _ = grad_func(machine, configs, times)
+
+    # Calculate gradients
+    grad = Ok_star_Eloc - Ok.conj() * Eloc
+    if grad.shape[1:] != machine.shape[1:]:
+      grad = grad.reshape((time_steps,) + machine.shape[1:])
+
+    # Update machine
+    machine.update(next(masked_optimizer)(grad, epoch))
+
+    # Calculate histories
+    full_psi = machine.dense
+    history["overlaps"].append(calc.overlap(full_psi, exact_state))
+    history["avg_overlaps"].append(calc.averaged_overlap(full_psi, exact_state))
+    if detenergy_func is not None:
+      history["sampled_Eloc"] = Eloc
+      # Calculate energy exactly (using all states) on the current machine state
+      exact_Eloc, _ = detenergy_func(full_psi)
+      history["exact_Eloc"].append(np.array(exact_Eloc).sum())
+    else:
+      history["exact_Eloc"].append(Eloc)
+
+    # Print messages
+    if n_message is not None and epoch % n_message == 0:
+      print("\nEpoch {}".format(epoch))
+      for k, val in history.items():
+        print("{}: {}".format(k, val[-1]))
+
+  return history, machine
