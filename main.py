@@ -159,8 +159,9 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
       opt_params["sampler"] = sampler(n_sites, time_steps, n_samples,
                                       n_corr, n_burn)
     else:
-      opt_params["grad_func"] = functools.partial(
-          machine.deterministic_gradient_func, ham=ham, dt=dt, ham2=ham2)
+      gradient_func = factory.machine_to_gradient_func[machine_type]
+      opt_params["grad_func"] = functools.partial(gradient_func,
+                ham=ham, dt=dt, ham2=ham2)
 
     # Optimize
     history, machine = optimize.globally(**opt_params)
