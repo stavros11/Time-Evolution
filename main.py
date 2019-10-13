@@ -145,8 +145,11 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
 
     if sweep_normalized:
       opt_params["sweeper"] = sweeping.NormalizedSweep(ham, dt, epsilon=1e-3,
-                optimizer=optimizer)
+                optimizer=None)
       # TODO: Add `epsilon` flag
+      # FIXME: Currently user cannot control this optimizer (cannot pass the
+      # already created optimizer because shapes are different compared
+      # to the global optimization case)
     else:
       sweeper_type = factory.machine_to_sweeper[machine_type]
       # TODO: Add `maxiter` flag

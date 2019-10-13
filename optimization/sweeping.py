@@ -4,6 +4,7 @@ During every step only the variational parameters of a specific time are
 updated while the rest are kept constant.
 Obviously for this to work, the ansatz has to have explicit time dependence.
 """
+import itertools
 import numpy as np
 from scipy.sparse import linalg
 from machines import base
@@ -132,39 +133,54 @@ class NormalizedSweep(Base):
     self.exp_u1 = identity - dtham
     self.exp_u1d = identity + dtham
     self.epsilon = epsilon
+
     self.optimizer = optimizer
+    n_sites = int(np.log2(len(ham)))
+    self.all_spin_confs = np.array(list(
+        itertools.product([1, -1], repeat=n_sites)))
 
-  def optimization_step(self, psi_t: np.ndarray, u_psi_prev: np.ndarray,
-                        epoch: int) -> Tuple[np.ndarray, float]:
-    norm_t = (np.abs(psi_t)**2).sum()
+  def optimization_step(self, machine: base.BaseMachine,
+                        u_psi_prev: np.ndarray,
+                        time_step: int,
+                        epoch: int) -> Tuple[base.BaseMachine, float]:
+    psi_t = machine.dense[time_step]
+    psi2_t = np.abs(psi_t)**2
+
+    norm_t = psi2_t.sum()
     alpha_psi_t = self.alpha_mat.dot(psi_t)
-
     energy_t = (psi_t.conj().dot(alpha_psi_t) -
                 2 * psi_t.conj().dot(u_psi_prev).real) / norm_t
-    grad = (alpha_psi_t - u_psi_prev - energy_t * psi_t) / norm_t
 
-    psi_t = psi_t + self.optimizer(grad, epoch)
-    return psi_t, energy_t.real
+    weights = machine.gradient(self.all_spin_confs, time_step)
+    shape = (len(self.all_spin_confs),) + machine.shape[1:]
+    slicer = (slice(None),) + len(machine.shape[1:]) * (np.newaxis,)
+    weights = weights.reshape(shape) * psi2_t[slicer]
+
+    Ok = weights.sum(axis=0) / norm_t
+    Ok_star_Eloc = ((alpha_psi_t - u_psi_prev)[slicer] *
+                    weights.conj()).sum(axis=0) / norm_t
+    grad = Ok_star_Eloc - Ok.conj() * energy_t
+
+    machine.update_time_step(self.optimizer(grad, epoch), time_step,
+                             replace=True)
+    return machine, energy_t
 
   def single_step(self, machine: base.BaseMachine, time_step: int
                   ) -> base.BaseMachine:
-    full_psi = machine.dense
-    psi_t = np.copy(full_psi[time_step])
     if self.optimizer is None:
-      self.optimizer = optimizers.AdamComplex(psi_t.shape, psi_t.dtype)
+      self.optimizer = optimizers.AdamComplex(machine.shape[1:], machine.dtype,
+                                              alpha=1e-5)
 
+    full_psi = machine.dense
     if self.going_forward:
       u_psi_prev = self.exp_u1.dot(full_psi[time_step - 1])
     else:
       u_psi_prev = self.exp_u1d.dot(full_psi[time_step + 1])
 
-    for epoch in range(10000):
-      psi_t, current_energy = self.optimization_step(psi_t, u_psi_prev, epoch)
-      #rel_error = np.abs((previous_energy - current_energy) / current_energy)
-      if epoch % 2000 == 0:
-        print("\nEpoch: {}".format(epoch))
-        print("Energy(t): {}".format(current_energy))
-
-    print("\n")
-    machine.update_time_step(psi_t, time_step)
+    print("\nOptimizing time step {}...".format(time_step))
+    for epoch in range(40000):
+      machine, current_energy = self.optimization_step(machine, u_psi_prev,
+                                                       time_step, epoch)
+      if epoch % 5000 == 0:
+        print("Epoch: {}, Energy(t): {}".format(epoch, current_energy))
     return machine

@@ -2,6 +2,7 @@
 
 import numpy as np
 from machines import base
+from typing import Union
 
 
 class FullWavefunction(base.BaseMachine):
@@ -38,22 +39,31 @@ class FullWavefunction(base.BaseMachine):
 
     return np.stack((psi_before, psi_now, psi_after))
 
-  def gradient(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
+  def gradient(self, configs: np.ndarray, times: Union[int, np.ndarray]
+               ) -> np.ndarray:
     # Configs should be in {-1, 1}
     configs_sl = tuple((configs < 0).astype(configs.dtype).T)
     n_samples = len(configs)
 
     grads = np.zeros((n_samples,) + self.shape[1:], dtype=self.dtype)
-    grads[(np.arange(n_samples),) + configs_sl] = (1.0 /
-          self.psi[(times,) + configs_sl])
 
+    if isinstance(times, int):
+      grads[(np.arange(n_samples),) + configs_sl] = (1.0 /
+            self.psi[times][configs_sl])
+    else:
+      grads[(np.arange(n_samples),) + configs_sl] = (1.0 /
+            self.psi[(times,) + configs_sl])
     return grads
 
   def update(self, to_add: np.ndarray):
     self.psi[1:] += to_add
 
-  def update_time_step(self, new: np.ndarray, time_step: np.ndarray):
-    self.psi[time_step] = new.reshape(self.psi.shape[1:])
+  def update_time_step(self, new: np.ndarray, time_step: np.ndarray,
+                       replace: bool = True):
+    if replace:
+      self.psi[time_step] = new.reshape(self.psi.shape[1:])
+    else:
+      self.psi[time_step] += new.reshape(self.psi.shape[1:])
 
 
 class FullWavefunctionNormalized(FullWavefunction):
