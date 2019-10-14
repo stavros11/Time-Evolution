@@ -11,6 +11,7 @@ from optimization import sampling
 from optimization import sweeping
 from machines import factory
 from samplers import samplers
+from utils import readsetup
 from utils import optimizers
 from utils import saving
 from utils import tfim
@@ -20,6 +21,11 @@ from typing import Optional
 
 
 parser = argparse.ArgumentParser()
+
+# Use set-up file instead of the argparser
+parser.add_argument("--setup-file", default="C:/Users/SU/Documents/GitHub/Time-Evolution/main_setups/allstates_setup.txt",
+                    type=str, help="Directory of the setup file to use.")
+
 # Directories
 parser.add_argument("--data-dir", default="/home/stavros/DATA/ClockV3/",
                     type=str, help="Basic directory that data is saved.")
@@ -217,4 +223,8 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
 
 if __name__ == '__main__':
   args = parser.parse_args()
-  main(**vars(args))
+  if args.setup_file is None:
+    margs = vars(args)
+  else:
+    margs = readsetup.read_main_setup(args.setup_file)
+  main(**margs)

@@ -1,0 +1,25 @@
+data_dir = "D:/ClockV3/",
+save_name = "globalnormsweep",
+
+n_sites = 6, 
+time_steps = 20, 
+t_final = 1.0, 
+h_ev = 0.5, 
+h_init = 1.0, 
+
+n_epochs = 2000, 
+n_message = 1000, 
+
+machine_type = "FullWavefunction", 
+
+sweep_time_normalization = False, 
+sweep_global_normalization = True, 
+sweep_no_normalization = False, 
+sweep_with_one_term = False, 
+opt_steps_per_time = 1000, 
+sweep_both_directions = False, 
+
+n_samples = 0, 
+n_corr = 1, 
+n_burn = 10, 
+sample_time = False
