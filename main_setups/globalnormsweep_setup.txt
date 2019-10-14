@@ -7,8 +7,8 @@ t_final = 1.0,
 h_ev = 0.5, 
 h_init = 1.0, 
 
-n_epochs = 2000, 
-n_message = 1000, 
+n_epochs = 10000, 
+n_message = 2000, 
 
 machine_type = "FullWavefunction", 
 
@@ -16,7 +16,7 @@ sweep_time_normalization = False,
 sweep_global_normalization = True, 
 sweep_no_normalization = False, 
 sweep_with_one_term = False, 
-opt_steps_per_time = 1000, 
+opt_steps_per_time = 400, 
 sweep_both_directions = False, 
 
 n_samples = 0, 
