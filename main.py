@@ -23,7 +23,7 @@ from typing import Optional
 parser = argparse.ArgumentParser()
 
 # Use set-up file instead of the argparser
-parser.add_argument("--setup-file", default="C:/Users/SU/Documents/GitHub/Time-Evolution/main_setups/allstates_setup.txt",
+parser.add_argument("--setup-file", default="C:/Users/SU/Documents/GitHub/Time-Evolution/main_setups/timenormsweep_setup.txt",
                     type=str, help="Directory of the setup file to use.")
 
 # Directories
@@ -169,8 +169,8 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
     if not sweep_with_one_term:
       raise NotImplementedError("Sweeping with time normalization is only "
                                 "implemented with previous time terms.")
-    opt_params["sweeper"] = sweeping.NormalizedSweep(ham, dt, epsilon=1e-3,
-              optimizer=None)
+    opt_params["sweeper"] = sweeping.NormalizedSweep(ham, dt,
+              opt_steps_per_time, optimizer=None)
     # TODO: Add `epsilon` flag
     # FIXME: Currently user cannot control this optimizer (cannot pass the
     # already created optimizer because shapes are different compared

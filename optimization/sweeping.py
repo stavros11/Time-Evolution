@@ -147,7 +147,7 @@ class ExactGMResSweep(Base):
 
 class NormalizedSweep(Base):
 
-  def __init__(self, ham: np.ndarray, dt: float, epsilon: float = 1e-6,
+  def __init__(self, ham: np.ndarray, dt: float, steps_per_time: int = 1000,
                optimizer: Optional[optimizers.BaseOptimizer] = None):
     self.going_forward = True
     dtham = 1j * dt * ham
@@ -158,7 +158,7 @@ class NormalizedSweep(Base):
     # Calculate expanded "unitary"
     self.exp_u1 = identity - dtham
     self.exp_u1d = identity + dtham
-    self.epsilon = epsilon
+    self.steps_per_time = steps_per_time
 
     self.optimizer = optimizer
     n_sites = int(np.log2(len(ham)))
@@ -196,17 +196,16 @@ class NormalizedSweep(Base):
     if self.optimizer is None:
       self.optimizer = optimizers.AdamComplex(machine.shape[1:], machine.dtype,
                                               alpha=1e-5)
-
     full_psi = machine.dense
     if self.going_forward:
       u_psi_prev = self.exp_u1.dot(full_psi[time_step - 1])
     else:
       u_psi_prev = self.exp_u1d.dot(full_psi[time_step + 1])
 
-    print("\nOptimizing time step {}...".format(time_step))
-    for epoch in range(40000):
+    #print("\nOptimizing time step {}...".format(time_step))
+    for epoch in range(self.steps_per_time):
       machine, current_energy = self.optimization_step(machine, u_psi_prev,
                                                        time_step, epoch)
-      if epoch % 5000 == 0:
-        print("Epoch: {}, Energy(t): {}".format(epoch, current_energy))
+      #if epoch % (self.steps_per_time // 10) == 0:
+      #print("Epoch: {}, Energy(t): {}".format(epoch, current_energy))
     return machine
