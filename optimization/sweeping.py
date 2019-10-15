@@ -170,9 +170,13 @@ class NormalizedSweep(Base):
                         time_step: int,
                         epoch: int) -> Tuple[base.BaseMachine, float]:
     psi_t = machine.dense[time_step]
+    if self.going_forward:
+      psi_n = machine.dense[time_step - 1]
+    else:
+      psi_n = machine.dense[time_step + 1]
     psi2_t = np.abs(psi_t)**2
 
-    norm_t = psi2_t.sum()
+    norm_t = (psi2_t + np.abs(psi_n)**2).sum()
     alpha_psi_t = self.alpha_mat.dot(psi_t)
     energy_t = (psi_t.conj().dot(alpha_psi_t) -
                 2 * psi_t.conj().dot(u_psi_prev).real) / norm_t

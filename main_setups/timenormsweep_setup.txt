@@ -16,7 +16,7 @@ sweep_time_normalization = True,
 sweep_global_normalization = False,
 sweep_no_normalization = False,
 sweep_with_one_term = True,
-opt_steps_per_time = 100,
+opt_steps_per_time = 2000,
 sweep_both_directions = False,
 
 n_samples = 0,
