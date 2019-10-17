@@ -22,16 +22,16 @@ parser = argparse.ArgumentParser()
 # Directories
 parser.add_argument("--data-dir", default="/home/stavros/DATA/ClockV3/",
                     type=str, help="Basic directory that data is saved.")
-parser.add_argument("--save-name", default="sampling", type=str,
+parser.add_argument("--save-name", default="allstates_withoverlap", type=str,
                     help="Name to use for distinguish the saved training data.")
 
 # System params
 parser.add_argument("--n-sites", default=6, type=int,
                     help="Number of sites in the TFIM chain.")
-parser.add_argument("--time-steps", default=20, type=int,
+parser.add_argument("--time-steps", default=100, type=int,
                     help="Number of time steps to evolve for. The initial "
                           "condition is not included in this.")
-parser.add_argument("--t-final", default=1.0, type=float,
+parser.add_argument("--t-final", default=2.0, type=float,
                     help="Duration of the evolution.")
 parser.add_argument("--h-ev", default=0.5, type=float,
                     help="Field under which TFIM is evolved.")

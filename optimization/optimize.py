@@ -3,6 +3,7 @@ from machines import base
 from optimization import sweeping
 from samplers import samplers
 from utils import calc
+from utils import misc
 from utils import optimizers
 from typing import Callable, Dict, List, Optional, Union, Tuple
 
@@ -49,11 +50,13 @@ def globally(exact_state: np.ndarray,
     machine. Machine object after its optimization is completed.
   """
   time_steps = len(exact_state) - 1
+  pauli = misc.Pauli(exact_state.dtype)
 
   if optimizer is None:
     optimizer = optimizers.AdamComplex(machine.shape, dtype=machine.dtype)
 
-  history = {"overlaps" : [], "avg_overlaps": [], "exact_Eloc": []}
+  history = {"overlaps" : [], "avg_overlaps": [], "exact_Eloc": [],
+             "time_overlaps": [], "time_norm": [], "time_sigma_x": []}
   if sampler is not None:
     history["sampled_Eloc"] = []
     if detenergy_func is None:
@@ -79,6 +82,9 @@ def globally(exact_state: np.ndarray,
     full_psi = machine.dense
     history["overlaps"].append(calc.overlap(full_psi, exact_state))
     history["avg_overlaps"].append(calc.averaged_overlap(full_psi, exact_state))
+    history["time_overlaps"].append(calc.time_overlap(full_psi, exact_state))
+    history["time_norm"].append((np.abs(full_psi)**2).sum(axis=1))
+    history["time_sigma_x"].append(calc.ev_local(full_psi, pauli.X))
     if detenergy_func is not None:
       history["sampled_Eloc"] = Eloc
       # Calculate energy exactly (using all states) on the current machine state
