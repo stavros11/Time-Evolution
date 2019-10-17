@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser()
 # Directories
 parser.add_argument("--data-dir", default="/home/stavros/DATA/ClockV3/",
                     type=str, help="Basic directory that data is saved.")
-parser.add_argument("--save-name", default="allstates_withoverlap", type=str,
+parser.add_argument("--save-name", default="allstates_tf2_withoverlap", type=str,
                     help="Name to use for distinguish the saved training data.")
 
 # System params
