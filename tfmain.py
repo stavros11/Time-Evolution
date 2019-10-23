@@ -39,11 +39,13 @@ parser.add_argument("--h-init", default=1.0, type=float,
 # TODO: Add a flag for giving an `init_state` instead of `h_init`.
 
 # Training params
-parser.add_argument("--n-epochs", default=4000, type=int,
+parser.add_argument("--machine-type", default="FullWavefunctionModel",
+                    type=str, help="Machine name defined in `autograd.py`.")
+parser.add_argument("--n-epochs", default=10000, type=int,
                     help="Number of epochs to train for.")
 parser.add_argument("--learning-rate", default=1e-3, type=float,
                     help="Adam optimizer learning rate.")
-parser.add_argument("--n-message", default=100, type=int,
+parser.add_argument("--n-message", default=500, type=int,
                     help="Every how many epochs to display messages.")
 
 # Sampling params
@@ -59,7 +61,7 @@ parser.add_argument("--n-message", default=100, type=int,
 
 
 def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
-         n_epochs: int,
+         n_epochs: int, machine_type: str,
          data_dir: str = "/home/stavros/DATA/Clock",
          save_name: str = "allstates",
          learning_rate: float = 1e-3,
@@ -94,16 +96,10 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
   # Set machine
-  #init_wavefunction = np.array((time_steps + 1) * [exact_state[0]])
-  #model_real = autograd.fullwv_model(init_wavefunction.real, dtype=tf.float64)
-  #model_imag = autograd.fullwv_model(init_wavefunction.imag, dtype=tf.float64)
-  model_real = autograd.feed_forward_model(n_sites + 1, dtype=tf.float64)
-  model_imag = autograd.feed_forward_model(n_sites + 1, dtype=tf.float64)
-  machine = autograd.BaseAutoGrad(model_real, model_imag,
-                                  n_sites=n_sites, time_steps=time_steps,
-                                  init_state=exact_state[0],
-                                  name="keras_feed_forward",
-                                  optimizer=optimizer)
+  machine = getattr(autograd, machine_type)(n_sites=n_sites,
+                                            time_steps=time_steps,
+                                            init_state=exact_state[0],
+                                            optimizer=optimizer)
 
   ham = tfim.tfim_hamiltonian(n_sites, h=h_ev, pbc=True)
   ham2 = ham.dot(ham)

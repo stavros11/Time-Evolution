@@ -10,10 +10,16 @@ from typing import List, Optional
 
 
 class BaseAutoGrad:
+  """Models optimized by `deterministic_auto` should inherit this class.
 
-  def __init__(self, model_real: tf.keras.Model, model_imag: tf.keras.Model,
-               n_sites: int, time_steps: int, init_state: np.ndarray,
-               name: Optional[str] = None,
+  To create a new model, inherit this and implement the `real` and `imag`
+  methods. Optionally redefine `cast_time` if the model takes one-hot times
+  as input.
+  """
+
+  def __init__(self, n_sites: int, time_steps: int,
+               init_state: np.ndarray,
+               input_type = tf.float32,
                optimizer: Optional[tf.train.Optimizer] = None):
     """Constructs machine given a keras model.
 
@@ -29,39 +35,22 @@ class BaseAutoGrad:
     # Time steps do not include initial condition
     self.n_sites = n_sites
     self.time_steps = time_steps
-    self.dtype = None # Type of the variational parameters
-    self.shape = None # Shape of the variational parameters
-    if name is None:
-      self.name = "keras_composite"
-    else:
-      self.name = name
-
-    self.real, self.imag = model_real, model_imag
-    self.input_type = model_real.input.dtype
-    input_shape = model_real.input.shape[-1]
-    self.variables = (model_real.trainable_variables +
-                      model_imag.trainable_variables)
+    self.dtype = None
+    self.shape = None
+    self.name = "keras"
 
     self._dense = None
+    self.input_type = input_type
     self.dense_shape = (time_steps + 1, 2**n_sites)
+    self.variables = []
 
     if optimizer is None:
       self.optimizer = tf.train.AdamOptimizer()
     else:
       self.optimizer = optimizer
 
-    if input_shape == self.n_sites + self.time_steps + 1:
-      # one-hot encoding for time
-      self.cast_time = self._one_hot_times
-    elif input_shape == self.n_sites + 1:
-      # single component encoding for time
-      self.cast_time = lambda t: tf.cast(t, dtype=self.input_type)[:, tf.newaxis]
-    else:
-      raise ValueError("Model input dimensions are {} which is not supported "
-                       "for given sites and time steps".format(input_shape))
-
-    # Mask only used for `fullwv_model` for sanity check
-    self.init_state = tf.cast(init_state[np.newaxis], dtype=self.output_type)
+    self.init_state = tf.convert_to_tensor(init_state[np.newaxis],
+                                           dtype=self.output_type)
 
   @property
   def dense(self) -> np.ndarray:
@@ -78,6 +67,11 @@ class BaseAutoGrad:
       return tf.complex128
     else:
       raise TypeError("Input type {} is unknown.".format(self.input_type))
+
+  def add_variable(self, init_value: np.ndarray) -> tf.Tensor:
+    var = tf.Variable(init_value, trainable=True, dtype=self.input_type)
+    self.variables.append(var)
+    return var
 
   def wavefunction(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
     """Calculates wavefunction value on given samples.
@@ -96,14 +90,16 @@ class BaseAutoGrad:
     # TODO: Add a flag in `model` to select one-hot encoding for time
     # and apply this here
     configs_tf = tf.cast(configs, dtype=self.input_type)
-    times_tf = self.cast_time(times)
-    inputs = tf.concat([configs_tf, times_tf], axis=1)
-    real, imag = self.real(inputs), self.imag(inputs)
-    psi_ev = tf.reshape(tf.complex(real, imag), self.dense_shape)
+    times_tf = tf.cast(times, dtype=self.input_type)
+    psi_forward = self.forward(configs_tf, times_tf)
+    psi_ev = tf.reshape(psi_forward, self.dense_shape)
     psi = tf.concat([self.init_state, psi_ev[1:]], axis=0)
 
     self._dense = psi.numpy().reshape(self.dense_shape)
     return psi
+
+  def forward(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
+    raise NotImplementedError
 
   def gradient(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
     raise NotImplementedError("Gradient method is not supported in AutoGrad "
@@ -117,37 +113,81 @@ class BaseAutoGrad:
                               "machines.")
 
 
+class FullWavefunctionModel(BaseAutoGrad):
+
+  def __init__(self, **kwargs):
+    init_state = kwargs["init_state"]
+    super(FullWavefunctionModel, self).__init__(**kwargs)
+    self.name = "fullwv_autograd"
+    self.n_states = 2**self.n_sites
+    self.to_binary = 2**np.arange(self.n_sites - 1, -1, -1)[:, np.newaxis]
+    self.to_binary = tf.convert_to_tensor(self.to_binary, dtype=self.input_type)
+
+    # Initialize full wavefunction by repeating the initial state
+    init_value = np.array((self.time_steps + 1) * [init_state]).ravel()
+    self.psi_re = self.add_variable(init_value.real)
+    self.psi_im = self.add_variable(init_value.imag)
+
+  def call(self, spins: tf.Tensor, times: tf.Tensor, psi: tf.Tensor) -> tf.Tensor:
+    spins = (1 + spins) / 2
+    spins = tf.cast(tf.matmul(spins, self.to_binary)[:, 0], dtype=tf.int32)
+    times = tf.cast(times, dtype=tf.int32)
+    indices = spins + self.n_states * times
+    return tf.gather(psi, indices)
+
+  def real(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
+    return self.call(configs, times, self.psi_re)
+
+  def imag(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
+    return self.call(configs, times, self.psi_im)
+
+  def forward(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
+    re = self.real(configs, times)
+    im = self.imag(configs, times)
+    return tf.complex(re, im)
+
+
+class FullPropagatorModel(BaseAutoGrad):
+
+  def __init__(self, **kwargs):
+    super(FullPropagatorModel, self).__init__(**kwargs)
+    self.name = "fullprop_autograd"
+    self.n_states = 2**self.n_sites
+    self.n_clock_states = self.n_states * (self.time_steps + 1)
+    self.to_binary = 2**np.arange(self.n_sites - 1, -1, -1)[:, np.newaxis]
+    self.to_binary = tf.convert_to_tensor(self.to_binary, dtype=self.input_type)
+
+    ident = np.eye(self.n_states)
+    noise = np.random.normal(0.0, 1e-2, size=ident.shape)
+    self.u_re = self.add_variable(ident + noise)
+    noise = np.random.normal(0.0, 1e-2, size=ident.shape)
+    self.u_im = self.add_variable(ident + noise)
+
+  def calculate_psis(self) -> tf.Tensor:
+    psis = [self.init_state[0][:, tf.newaxis]]
+    u = tf.complex(self.u_re, self.u_im)
+    for _ in range(self.time_steps):
+      psis.append(tf.matmul(u, psis[-1]))
+    return tf.reshape(tf.stack(psis), (self.n_clock_states,))
+
+  def call(self, spins: tf.Tensor, times: tf.Tensor, psi: tf.Tensor) -> tf.Tensor:
+    spins = (1 + spins) / 2
+    spins = tf.cast(tf.matmul(spins, self.to_binary)[:, 0], dtype=tf.int32)
+    times = tf.cast(times, dtype=tf.int32)
+    indices = spins + self.n_states * times
+    return tf.gather(psi, indices)
+
+  def forward(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
+    psis = self.calculate_psis()
+    return self.call(configs, times, psis)
+
+
 def feed_forward_model(n_input: int, n_output: int = 1, dtype=tf.float32) -> tf.keras.Model:
   """Simple feed forward keras model."""
+  # THIS IS DEPRECATED!
   model = tf.keras.models.Sequential()
   model.add(layers.Input(n_input, dtype=dtype))
   model.add(layers.Dense(20, activation="relu", dtype=dtype))
   model.add(layers.Dense(20, activation="relu", dtype=dtype))
   model.add(layers.Dense(n_output, activation="sigmoid", dtype=dtype))
-  return model
-
-
-def fullwv_model(init_wavefunction: np.ndarray, dtype=tf.float32) -> tf.keras.Model:
-  n_states = init_wavefunction.shape[-1]
-  n_sites = int(np.log2(n_states))
-  to_binary = 2**np.arange(n_sites - 1, -1, -1)[:, np.newaxis]
-  to_binary = tf.convert_to_tensor(to_binary, dtype=dtype)
-
-  class FullWVLayer(layers.Layer):
-
-    def __init__(self, init_value: np.ndarray, dtype=tf.float32):
-      super(FullWVLayer, self).__init__()
-      self.n_states = init_value.shape[-1]
-      self.psi = tf.Variable(init_value.ravel(), trainable=True, dtype=dtype)
-
-    def call(self, inputs: tf.Tensor) -> tf.Tensor:
-      spins = (1 + inputs[:, :-1]) / 2
-      spins = tf.cast(tf.matmul(spins, to_binary)[:, 0], dtype=tf.int32)
-      times = tf.cast(inputs[:, -1], dtype=tf.int32)
-      indices = spins + self.n_states * times
-      return tf.gather(self.psi, indices)
-
-  model = tf.keras.models.Sequential()
-  model.add(layers.Input(n_sites + 1, dtype=dtype))
-  model.add(FullWVLayer(init_wavefunction, dtype))
   return model
