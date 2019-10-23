@@ -5,16 +5,14 @@ Machines are used when optimizing with sampling.
 """
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers
 from typing import List, Optional
 
 
 class BaseAutoGrad:
   """Models optimized by `deterministic_auto` should inherit this class.
 
-  To create a new model, inherit this and implement the `real` and `imag`
-  methods. Optionally redefine `cast_time` if the model takes one-hot times
-  as input.
+  To create a new model, inherit this and implement the `forward` method.
+  Optionally redefine `cast_time` if the model takes one-hot times as input.
   """
 
   def __init__(self, n_sites: int, time_steps: int,
@@ -73,7 +71,7 @@ class BaseAutoGrad:
     self.variables.append(var)
     return var
 
-  def wavefunction(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
+  def wavefunction(self) -> tf.Tensor:
     """Calculates wavefunction value on given samples.
 
     Note that currently this works only if configs and times are all the
@@ -89,16 +87,12 @@ class BaseAutoGrad:
     """
     # TODO: Add a flag in `model` to select one-hot encoding for time
     # and apply this here
-    configs_tf = tf.cast(configs, dtype=self.input_type)
-    times_tf = tf.cast(times, dtype=self.input_type)
-    psi_forward = self.forward(configs_tf, times_tf)
-    psi_ev = tf.reshape(psi_forward, self.dense_shape)
+    psi_ev = self.forward()
     psi = tf.concat([self.init_state, psi_ev[1:]], axis=0)
-
     self._dense = psi.numpy().reshape(self.dense_shape)
     return psi
 
-  def forward(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
+  def forward(self) -> tf.Tensor:
     raise NotImplementedError
 
   def gradient(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
@@ -119,32 +113,15 @@ class FullWavefunctionModel(BaseAutoGrad):
     init_state = kwargs["init_state"]
     super(FullWavefunctionModel, self).__init__(**kwargs)
     self.name = "fullwv_autograd"
-    self.n_states = 2**self.n_sites
-    self.to_binary = 2**np.arange(self.n_sites - 1, -1, -1)[:, np.newaxis]
-    self.to_binary = tf.convert_to_tensor(self.to_binary, dtype=self.input_type)
 
     # Initialize full wavefunction by repeating the initial state
     init_value = np.array((self.time_steps + 1) * [init_state]).ravel()
     self.psi_re = self.add_variable(init_value.real)
     self.psi_im = self.add_variable(init_value.imag)
 
-  def call(self, spins: tf.Tensor, times: tf.Tensor, psi: tf.Tensor) -> tf.Tensor:
-    spins = (1 + spins) / 2
-    spins = tf.cast(tf.matmul(spins, self.to_binary)[:, 0], dtype=tf.int32)
-    times = tf.cast(times, dtype=tf.int32)
-    indices = spins + self.n_states * times
-    return tf.gather(psi, indices)
-
-  def real(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
-    return self.call(configs, times, self.psi_re)
-
-  def imag(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
-    return self.call(configs, times, self.psi_im)
-
-  def forward(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
-    re = self.real(configs, times)
-    im = self.imag(configs, times)
-    return tf.complex(re, im)
+  def forward(self) -> tf.Tensor:
+    psi = tf.complex(self.psi_re, self.psi_im)
+    return tf.reshape(psi, self.dense_shape)
 
 
 class FullPropagatorModel(BaseAutoGrad):
@@ -153,41 +130,17 @@ class FullPropagatorModel(BaseAutoGrad):
     super(FullPropagatorModel, self).__init__(**kwargs)
     self.name = "fullprop_autograd"
     self.n_states = 2**self.n_sites
-    self.n_clock_states = self.n_states * (self.time_steps + 1)
-    self.to_binary = 2**np.arange(self.n_sites - 1, -1, -1)[:, np.newaxis]
-    self.to_binary = tf.convert_to_tensor(self.to_binary, dtype=self.input_type)
 
+    # Initialize propagator close to identity
     ident = np.eye(self.n_states)
     noise = np.random.normal(0.0, 1e-2, size=ident.shape)
     self.u_re = self.add_variable(ident + noise)
     noise = np.random.normal(0.0, 1e-2, size=ident.shape)
     self.u_im = self.add_variable(ident + noise)
 
-  def calculate_psis(self) -> tf.Tensor:
+  def forward(self) -> tf.Tensor:
     psis = [self.init_state[0][:, tf.newaxis]]
     u = tf.complex(self.u_re, self.u_im)
     for _ in range(self.time_steps):
       psis.append(tf.matmul(u, psis[-1]))
-    return tf.reshape(tf.stack(psis), (self.n_clock_states,))
-
-  def call(self, spins: tf.Tensor, times: tf.Tensor, psi: tf.Tensor) -> tf.Tensor:
-    spins = (1 + spins) / 2
-    spins = tf.cast(tf.matmul(spins, self.to_binary)[:, 0], dtype=tf.int32)
-    times = tf.cast(times, dtype=tf.int32)
-    indices = spins + self.n_states * times
-    return tf.gather(psi, indices)
-
-  def forward(self, configs: tf.Tensor, times: tf.Tensor) -> tf.Tensor:
-    psis = self.calculate_psis()
-    return self.call(configs, times, psis)
-
-
-def feed_forward_model(n_input: int, n_output: int = 1, dtype=tf.float32) -> tf.keras.Model:
-  """Simple feed forward keras model."""
-  # THIS IS DEPRECATED!
-  model = tf.keras.models.Sequential()
-  model.add(layers.Input(n_input, dtype=dtype))
-  model.add(layers.Dense(20, activation="relu", dtype=dtype))
-  model.add(layers.Dense(20, activation="relu", dtype=dtype))
-  model.add(layers.Dense(n_output, activation="sigmoid", dtype=dtype))
-  return model
+    return tf.stack(psis)[:, :, 0]

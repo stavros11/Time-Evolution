@@ -68,12 +68,9 @@ def gradient(machine: autograd.BaseAutoGrad,
   all_configs = np.array(list(itertools.product([-1, 1], repeat=n_sites)))
   n_states = len(all_configs)
 
-  times = np.repeat(np.arange(time_steps + 1), n_states)
-  configs = np.concatenate((time_steps + 1) * [all_configs], axis=0)
-
   with tf.GradientTape() as tape:
     tape.watch(machine.variables)
-    full_psi = machine.wavefunction(configs, times)
+    full_psi = machine.wavefunction()
     heff_ev = energy(full_psi, ham, dt, ham2)
 
   grad = tape.gradient(heff_ev, machine.variables)
