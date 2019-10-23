@@ -10,7 +10,7 @@ calculate expectation values deterministically.
 import itertools
 import numpy as np
 import tensorflow as tf
-from machines import autograd
+from machines.autograd import base
 from typing import List, Optional, Tuple
 
 
@@ -60,14 +60,10 @@ def energy(psi_all: tf.Tensor, Ham: tf.Tensor, dt: float,
   return tf.real(Heff_total) / phi_phi
 
 
-def gradient(machine: autograd.BaseAutoGrad,
+def gradient(machine: base.BaseAutoGrad,
              ham: tf.Tensor, dt: float,
              ham2: Optional[tf.Tensor] = None
              ) -> Tuple[List[tf.Tensor], None, np.ndarray, None]:
-  n_sites, time_steps = machine.n_sites, machine.time_steps
-  all_configs = np.array(list(itertools.product([-1, 1], repeat=n_sites)))
-  n_states = len(all_configs)
-
   with tf.GradientTape() as tape:
     tape.watch(machine.variables)
     full_psi = machine.wavefunction()

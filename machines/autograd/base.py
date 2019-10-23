@@ -87,8 +87,7 @@ class BaseAutoGrad:
     """
     # TODO: Add a flag in `model` to select one-hot encoding for time
     # and apply this here
-    psi_ev = self.forward()
-    psi = tf.concat([self.init_state, psi_ev[1:]], axis=0)
+    psi = self.forward()
     self._dense = psi.numpy().reshape(self.dense_shape)
     return psi
 
@@ -105,42 +104,3 @@ class BaseAutoGrad:
   def update_time_step(self, new: np.ndarray, time_step: int):
     raise NotImplementedError("Step update is not supported in AutoGrad "
                               "machines.")
-
-
-class FullWavefunctionModel(BaseAutoGrad):
-
-  def __init__(self, **kwargs):
-    init_state = kwargs["init_state"]
-    super(FullWavefunctionModel, self).__init__(**kwargs)
-    self.name = "fullwv_autograd"
-
-    # Initialize full wavefunction by repeating the initial state
-    init_value = np.array((self.time_steps + 1) * [init_state]).ravel()
-    self.psi_re = self.add_variable(init_value.real)
-    self.psi_im = self.add_variable(init_value.imag)
-
-  def forward(self) -> tf.Tensor:
-    psi = tf.complex(self.psi_re, self.psi_im)
-    return tf.reshape(psi, self.dense_shape)
-
-
-class FullPropagatorModel(BaseAutoGrad):
-
-  def __init__(self, **kwargs):
-    super(FullPropagatorModel, self).__init__(**kwargs)
-    self.name = "fullprop_autograd"
-    self.n_states = 2**self.n_sites
-
-    # Initialize propagator close to identity
-    ident = np.eye(self.n_states)
-    noise = np.random.normal(0.0, 1e-2, size=ident.shape)
-    self.u_re = self.add_variable(ident + noise)
-    noise = np.random.normal(0.0, 1e-2, size=ident.shape)
-    self.u_im = self.add_variable(ident + noise)
-
-  def forward(self) -> tf.Tensor:
-    psis = [self.init_state[0][:, tf.newaxis]]
-    u = tf.complex(self.u_re, self.u_im)
-    for _ in range(self.time_steps):
-      psis.append(tf.matmul(u, psis[-1]))
-    return tf.stack(psis)[:, :, 0]

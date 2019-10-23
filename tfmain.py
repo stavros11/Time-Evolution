@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 tf.enable_v2_behavior()
 
-from machines import autograd
+from machines.autograd import factory
 from optimization import deterministic_auto
 from optimization import optimize
 from utils import saving
@@ -39,7 +39,7 @@ parser.add_argument("--h-init", default=1.0, type=float,
 # TODO: Add a flag for giving an `init_state` instead of `h_init`.
 
 # Training params
-parser.add_argument("--machine-type", default="FullWavefunctionModel",
+parser.add_argument("--machine-type", default="FullWavefunction",
                     type=str, help="Machine name defined in `autograd.py`.")
 parser.add_argument("--n-epochs", default=10000, type=int,
                     help="Number of epochs to train for.")
@@ -96,10 +96,10 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
   # Set machine
-  machine = getattr(autograd, machine_type)(n_sites=n_sites,
-                                            time_steps=time_steps,
-                                            init_state=exact_state[0],
-                                            optimizer=optimizer)
+  machine = getattr(factory, machine_type)(n_sites=n_sites,
+                                           time_steps=time_steps,
+                                           init_state=exact_state[0],
+                                           optimizer=optimizer)
 
   ham = tfim.tfim_hamiltonian(n_sites, h=h_ev, pbc=True)
   ham2 = ham.dot(ham)
