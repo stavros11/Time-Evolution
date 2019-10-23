@@ -11,7 +11,7 @@ class StepConvModel(base.BaseAutoGrad):
 
   def __init__(self, **kwargs):
     super(StepConvModel, self).__init__(**kwargs)
-    self.name = "heuristic_conv"
+    self.name = "step_conv"
 
     self.models_re = [self.create_model() for _ in range(self.time_steps)]
     self.models_im = [self.create_model() for _ in range(self.time_steps)]
@@ -46,7 +46,7 @@ class StepFeedForwardModel(base.BaseAutoGrad):
 
   def __init__(self, **kwargs):
     super(StepFeedForwardModel, self).__init__(**kwargs)
-    self.name = "heuristic_conv"
+    self.name = "step_ffnn"
 
     all_confs = list(itertools.product([0, 1], repeat=self.n_sites))
     all_confs = np.array(self.time_steps * [all_confs]).swapaxes(0, 1)
