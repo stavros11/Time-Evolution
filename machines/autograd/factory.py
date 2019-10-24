@@ -7,5 +7,6 @@ from machines.autograd import neural
 FullWavefunction = full.FullWavefunctionModel
 FullPropagator = full.FullPropagatorModel
 SmallMPS = mps.SmallMPSModel
+MPSProductProp = mps.SmallMPSProductPropModel
 StepConv = neural.StepConvModel
 StepFeedForward = neural.StepFeedForwardModel
