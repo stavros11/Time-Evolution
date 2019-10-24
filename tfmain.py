@@ -7,7 +7,6 @@ import argparse
 import functools
 import numpy as np
 import tensorflow as tf
-tf.enable_v2_behavior()
 
 from machines.autograd import factory
 from optimization import deterministic_auto
@@ -93,7 +92,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
                                              init_state=init_state)
 
   # Set optimizer
-  optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+  optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
   # Set machine
   machine = getattr(factory, machine_type)(n_sites=n_sites,
@@ -113,7 +112,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
 
   print("\n\nInitializing training with {}.".format(machine.name))
   filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
-  print("Results will be saved at {}.\n\n".format(filename))
+  print("Results will be saved at {}.".format(filename))
 
   # Optimize
   history, machine = optimize.globally(**opt_params)

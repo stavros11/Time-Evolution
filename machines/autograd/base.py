@@ -5,6 +5,7 @@ Machines are used when optimizing with sampling.
 """
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras import optimizers
 from typing import List, Optional
 
 
@@ -18,7 +19,7 @@ class BaseAutoGrad:
   def __init__(self, n_sites: int, time_steps: int,
                init_state: np.ndarray,
                input_type = tf.float32,
-               optimizer: Optional[tf.train.Optimizer] = None):
+               optimizer: Optional[optimizers.Optimizer] = None):
     """Constructs machine given a keras model.
 
     Args:
@@ -43,7 +44,7 @@ class BaseAutoGrad:
     self.variables = []
 
     if optimizer is None:
-      self.optimizer = tf.train.AdamOptimizer()
+      self.optimizer = optimizers.Adam()
     else:
       self.optimizer = optimizer
 

@@ -7,7 +7,6 @@ Requires the full wavefunction at each time step and uses all states to
 calculate expectation values deterministically.
 (exponentially expensive sum - no sampling!)
 """
-import itertools
 import numpy as np
 import tensorflow as tf
 from machines.autograd import base
@@ -56,8 +55,8 @@ def energy(psi_all: tf.Tensor, Ham: tf.Tensor, dt: float,
   phi_phi = tf.reduce_sum(tf.square(tf.abs(psi_all)))
   Heff_samples = tf.concat(
       [n_Heff_0[tf.newaxis], n_Heff, n_Heff_M[tf.newaxis]], axis=0)
-  Heff_total = tf.reduce_sum(tf.conj(psi_all) * Heff_samples)
-  return tf.real(Heff_total) / phi_phi
+  Heff_total = tf.reduce_sum(tf.math.conj(psi_all) * Heff_samples)
+  return tf.math.real(Heff_total) / phi_phi
 
 
 def gradient(machine: base.BaseAutoGrad,
