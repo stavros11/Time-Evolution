@@ -111,11 +111,14 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   opt_params["grad_func"] = functools.partial(deterministic_auto.gradient,
             ham=ham_tf, dt=dt, ham2=ham2_tf)
 
+  print("\n\nInitializing training with {}.".format(machine.name))
+  filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
+  print("Results will be saved at {}.\n\n".format(filename))
+
   # Optimize
   history, machine = optimize.globally(**opt_params)
 
   # Save training histories and final wavefunction
-  filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
   saving.save_histories(data_dir, filename, history)
   saving.save_dense_wavefunction(data_dir, filename, machine.dense)
 
