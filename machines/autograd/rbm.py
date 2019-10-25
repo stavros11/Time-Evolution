@@ -52,9 +52,9 @@ def logrbm_forward(v: tf.Tensor, w: tf.Tensor, b: tf.Tensor, c: tf.Tensor
   Returns:
     Activations of shape (n_batch,)
   """
-  cosh = tf.math.cosh(tf.matmul(v, w) + b[tf.newaxis])
+  logcosh = tf.math.log(tf.math.cosh(tf.matmul(v, w) + b[tf.newaxis]))
   exp = tf.matmul(v, c[:, tf.newaxis])
-  return exp[:, 0] + tf.reduce_sum(cosh, axis=-1)
+  return exp[:, 0] + tf.reduce_sum(logcosh, axis=-1)
 
 
 def fit_rbm_to_dense(state: np.ndarray, n_hidden: int,
@@ -116,11 +116,15 @@ class SmallRBMModel(base.BaseAutoGrad):
     self.name = "rbm_autograd"
     self.n_hidden = self.n_sites
 
+    self._create_variables(init_state)
+    all_confs = np.array(list(itertools.product([-1, 1], repeat=self.n_sites)))
+    self.all_confs = tf.convert_to_tensor(all_confs, dtype=self.output_type)
+
+  def _create_variables(self, init_state: np.ndarray):
     w, b, c = fit_rbm_to_dense(init_state, n_hidden=self.n_hidden,
                                target_fidelity=1e-4)
-
     self.w_re, self.w_im = self._add_variable(w)
-    self.b_re, self.c_im = self._add_variable(b)
+    self.b_re, self.b_im = self._add_variable(b)
     self.c_re, self.c_im = self._add_variable(c)
 
   def _add_variable(self, v: np.ndarray) -> tf.Tensor:
@@ -135,5 +139,60 @@ class SmallRBMModel(base.BaseAutoGrad):
     c = tf.complex(self.c_re, self.c_im)
     return w, b, c
 
+  def logforward(self):
+    w, b, c = self.complex_params()
+    csigma = tf.einsum("tj,bj->tb", c, self.all_confs)
+    wsigma = tf.einsum("tji,bj->tbi", w, self.all_confs)
+    logcosh = tf.math.log(tf.math.cosh(wsigma + b[:, tf.newaxis]))
+    return csigma + tf.reduce_sum(logcosh, axis=-1)
+
   def forward(self):
-    pass
+    psi = tf.math.exp(self.logforward())
+    return tf.concat([self.init_state, psi], axis=0)
+
+
+class SmallRBMProductPropModel(SmallRBMModel):
+
+  def _create_variables(self, init_state: np.ndarray):
+    w, b, c = fit_rbm_to_dense(init_state, n_hidden=self.n_hidden,
+                               target_fidelity=1e-4)
+    self.w0 = tf.convert_to_tensor(w.ravel()[:, np.newaxis],
+                                   dtype=self.output_type)
+    self.b0 = tf.convert_to_tensor(b[:, np.newaxis], dtype=self.output_type)
+    self.c0 = tf.convert_to_tensor(c[:, np.newaxis], dtype=self.output_type)
+
+    self.propagators = {
+        "w_re": self.add_variable(self._initialize(
+            self.n_hidden * self.n_sites, True)),
+        "w_im": self.add_variable(self._initialize(
+            self.n_hidden * self.n_sites, False)),
+        "b_re": self.add_variable(self._initialize(self.n_hidden, True)),
+        "b_im": self.add_variable(self._initialize(self.n_hidden, False)),
+        "c_re": self.add_variable(self._initialize(self.n_sites, True)),
+        "c_im": self.add_variable(self._initialize(self.n_sites, False))}
+
+  @staticmethod
+  def _initialize(n: int, close_to_eye: bool = False,
+                  std: float = 1e-2) -> np.ndarray:
+    ident = np.eye(n)
+    noise = np.random.normal(0.0, std, size=ident.shape)
+    if close_to_eye:
+      return ident + noise
+    return noise
+
+  def complex_params(self) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
+    params = {"w": [self.w0], "b": [self.b0], "c": [self.c0]}
+    props = {k: tf.complex(self.propagators["{}_re".format(k)],
+                           self.propagators["{}_im".format(k)])
+             for k in params.keys()}
+
+    for _ in range(self.time_steps):
+      for k in params.keys():
+        params[k].append(tf.matmul(props[k], params[k][-1]))
+
+    for k in params.keys():
+      params[k] = tf.stack(params[k][1:])[:, :, 0]
+
+    w_shape = (self.time_steps, self.n_sites, self.n_hidden)
+    w = tf.reshape(params["w"], w_shape)
+    return w, params["b"], params["c"]
