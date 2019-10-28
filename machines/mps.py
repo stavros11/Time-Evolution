@@ -2,37 +2,41 @@
 
 import numpy as np
 from machines import base
-from optimization import deterministic
+from utils import optimizers
 from utils.mps import mps as utils
-from typing import Callable, Tuple
+from typing import Tuple
 
 
 class SmallMPS(base.BaseMachine):
   """MPS machine for small systems - uses dense wavefunctions."""
 
   def __init__(self, init_state: np.ndarray, time_steps: int, d_bond: int,
-               d_phys: int = 2):
+               d_phys: int = 2, learning_rate: float = 1e-3):
     self.n_states = len(init_state)
-    self.n_sites = int(np.log2(self.n_states))
-    self.time_steps = time_steps
+    n_sites = int(np.log2(self.n_states))
+    name = "mpsD{}".format(d_bond)
+    super(SmallMPS, self).__init__(name, n_sites, time_steps)
     self.d_bond, self.d_phys = d_bond, d_phys
-    self.name = "mpsD{}".format(d_bond)
 
+    # Initialize tensors
     tensors = np.array((time_steps + 1) *
                        [utils.dense_to_mps(init_state, d_bond)])
     self.tensors = tensors.transpose([0, 1, 3, 2, 4])
     self.dtype = self.tensors.dtype
-    self.shape = self.tensors[1:].shape
-
     self._dense = self._create_envs()
+
+    self.optimizer = optimizers.AdamComplex(self.shape, dtype=self.dtype,
+                                            alpha=learning_rate)
+
+  @property
+  def shape(self) -> Tuple[int]:
+    return self.tensors[1:].shape
 
   @property
   def dense(self) -> np.ndarray:
+    if self._dense is None:
+      self._dense = self._create_envs()
     return self._dense.reshape((self.time_steps + 1, self.n_states))
-
-  @property
-  def deterministic_gradient_func(self) -> Callable:
-    return deterministic.sampling_gradient
 
   def _vectorized_svd_split(self, m: np.ndarray
                             ) -> Tuple[np.ndarray, np.ndarray]:
@@ -159,19 +163,26 @@ class SmallMPS(base.BaseMachine):
     dense_slicer += (len(self.shape) - 1) * (np.newaxis,)
     return grads / self._dense[dense_slicer]
 
-  def update(self, to_add: np.ndarray) -> np.ndarray:
+  def update(self, grad: np.ndarray, epoch: int):
+    if grad.shape != self.shape:
+      grad = grad.reshape(self.shape)
+    to_add = self.optimizer(grad, epoch)
     self.tensors[1:] += to_add
-    self._dense = self._create_envs()
+    self._dense = None
 
-  def update_time_step(self, new: np.ndarray, time_step: np.ndarray):
-    # Assume that dense is a dense form and NOT an MPS in order to use
-    # the `ExactGMResSweep` sweeper as it is for the full wavefunction
-    new_mps = utils.dense_to_mps(new, self.d_bond)
-    self.tensors[time_step] = new_mps.swapaxes(1, 2)
-    # TODO: This call can be optimized as we can only recalculate the `envs`
-    # of the time step that we updated, while `_create_envs()` recalculates
-    # all environments as it was designed for global optimization
-    self._dense = self._create_envs()
+  def add_time_step(self):
+    self.time_steps += 1
+    new_shape = (self.time_steps + 1,) + self.shape[1:]
+    new_tensors = np.zeros(new_shape, dtype=self.dtype)
+
+    new_tensors[:-1] = np.copy(self.tensors)
+    new_tensors[-1] = np.copy(self.tensors[-1])
+    self.tensors = new_tensors
+    self._dense = None
+
+    learning_rate = self.optimizer.alpha
+    self.optimizer = optimizers.AdamComplex(self.shape, dtype=self.dtype,
+                                            alpha=learning_rate)
 
 
 class SmallMPSNormalized(SmallMPS):
