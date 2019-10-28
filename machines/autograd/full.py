@@ -55,3 +55,6 @@ class FullPropagatorModel(base.BaseAutoGrad):
       psis.append(tf.matmul(u, psis[-1]))
     psi = tf.stack(psis)[1:, :, 0]
     return tf.concat([self.init_state, psi], axis=0)
+
+  def add_time_step(self):
+    self.time_steps += 1

@@ -123,15 +123,17 @@ class SmallRBMModel(base.BaseAutoGrad):
   def _create_variables(self, init_state: np.ndarray):
     w, b, c = fit_rbm_to_dense(init_state, n_hidden=self.n_hidden,
                                target_fidelity=1e-4)
-    self.w_re, self.w_im = self._add_variable(w)
-    self.b_re, self.b_im = self._add_variable(b)
-    self.c_re, self.c_im = self._add_variable(c)
+    self._add_variables(np.array(self.time_steps * [w]),
+                        np.array(self.time_steps * [b]),
+                        np.array(self.time_steps * [c]))
 
-  def _add_variable(self, v: np.ndarray) -> tf.Tensor:
-    vt = np.array(self.time_steps * [v])
-    re = self.add_variable(vt.real)
-    im = self.add_variable(vt.imag)
-    return re, im
+  def _add_variables(self, wt: np.ndarray, bt: np.ndarray, ct: np.ndarray
+                     ) -> tf.Tensor:
+    add_variable = lambda v: (self.add_variable(v.real),
+                              self.add_variable(v.imag))
+    self.w_re, self.w_im = add_variable(wt)
+    self.b_re, self.b_im = add_variable(bt)
+    self.c_re, self.c_im = add_variable(ct)
 
   def complex_params(self) -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor]:
     w = tf.complex(self.w_re, self.w_im)
@@ -149,6 +151,24 @@ class SmallRBMModel(base.BaseAutoGrad):
   def forward(self):
     psi = tf.math.exp(self.logforward())
     return tf.concat([self.init_state, psi], axis=0)
+
+  @staticmethod
+  def _add_time_step_to_variable(v: np.ndarray) -> np.ndarray:
+    new_shape = (len(v) + 1,) + v.shape[1:]
+    new_v = np.zeros(new_shape, dtype=v.dtype)
+    new_v[:-1] = np.copy(v)
+    new_v[-1] = np.copy(v[-1])
+    return new_v
+
+  def add_time_step(self):
+    self.variables = []
+    self.time_steps += 1
+
+    old_params = self.complex_params()
+    arg_names = ["wt", "bt", "ct"]
+    old_params = {k: self._add_time_step_to_variable(x.numpy())
+                  for k, x in zip(arg_names, old_params)}
+    self._add_variables(**old_params)
 
 
 class SmallRBMProductPropModel(SmallRBMModel):
