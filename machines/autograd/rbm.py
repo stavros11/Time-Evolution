@@ -216,3 +216,6 @@ class SmallRBMProductPropModel(SmallRBMModel):
     w_shape = (self.time_steps, self.n_sites, self.n_hidden)
     w = tf.reshape(params["w"], w_shape)
     return w, params["b"], params["c"]
+
+  def add_time_step(self):
+    self.time_steps += 1
