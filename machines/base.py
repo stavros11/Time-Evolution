@@ -4,19 +4,29 @@ All machines should inherit this.
 Machines are used when optimizing with sampling.
 """
 import numpy as np
+from typing import Tuple
 
 
 class BaseMachine:
   """Base machine to use with Clock optimization."""
 
-  def __init__(self, n_sites: int, time_steps: int):
+  def __init__(self, name: str, n_sites: int, time_steps: int):
+    # TODO: Support optimizer type - currently not useful as we only have
+    # complex Adam implemented
+
     # Time steps do not include initial condition
     # __init__ should define the following attributes
+    self.name = name # Name (str) of the machine for saving purposes
     self.n_sites = n_sites
     self.time_steps = time_steps
     self.dtype = None # Type of the variational parameters
-    self.shape = None # Shape of the variational parameters
-    self.name = None # Name (str) of the machine for saving purposes
+    # Optimizer to use for updating the variational parameters
+    self.optimizer = None
+
+  @property
+  def shape(self) -> Tuple[int]:
+    """Shape of the variational parameters."""
+    raise NotImplementedError
 
   @property
   def dense(self) -> np.ndarray:
@@ -57,19 +67,20 @@ class BaseMachine:
     """
     raise NotImplementedError
 
-  def update(self, to_add: np.ndarray):
+  def update(self, grad: np.ndarray, epoch: int):
     """Updates variational parameters.
 
     Args:
-      to_add: Value to add to the variational parameters.
+      grad: Gradient to use for updating the variational parameters.
+      epoch: Epoch number of optimization (needed for Adam optimizer).
     """
+    # TODO: Define this in `Base` so that you don't have to define it
+    # again for all machines indepedently.
     raise NotImplementedError
 
-  def update_time_step(self, new: np.ndarray, time_step: int):
-    """Updates variational parameters at a single time step.
+  def add_time_step(self):
+    """Adds an additional time step to the machine's parameters.
 
-    Args:
-      new: New values of the variational parameters.
-      time_step: Time step to update.
+    Used when growing in time during optimization.
     """
     raise NotImplementedError
