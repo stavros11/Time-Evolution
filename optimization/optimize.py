@@ -66,15 +66,21 @@ def globally(machine: base.BaseMachine,
       Ok, Ok_star_Eloc, Eloc, _, _ = grad_func(machine, configs, times)
 
     # Calculate gradients
-    grad = Ok_star_Eloc - Ok.conj() * Eloc
-    if index_to_update is not None:
-      assert index_to_update < machine.time_steps
-      new_grad = np.zeros_like(grad)
-      new_grad[index_to_update] = np.copy(grad[index_to_update])
-      grad = new_grad
-
-    # Update machine
-    machine.update(grad, epoch)
+    if Ok_star_Eloc is None:
+      # this means that we are using automatic gradients and we can directly
+      # update the machine using Ok.
+      machine.update(Ok)
+    else:
+      # in this case we have to use VMC formulas for the gradients and do
+      # the update in numpy.
+      grad = Ok_star_Eloc - Ok.conj() * Eloc
+      if index_to_update is not None:
+        assert index_to_update < machine.time_steps
+        new_grad = np.zeros_like(grad)
+        new_grad[index_to_update] = np.copy(grad[index_to_update])
+        grad = new_grad
+      # Update machine
+      machine.update(grad, epoch)
 
     # Calculate histories
     full_psi = machine.dense
