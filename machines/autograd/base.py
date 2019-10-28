@@ -6,7 +6,7 @@ Machines are used when optimizing with sampling.
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import optimizers
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 
 class BaseAutoGrad:
@@ -35,12 +35,10 @@ class BaseAutoGrad:
     self.n_sites = n_sites
     self.time_steps = time_steps
     self.dtype = None
-    self.shape = None
     self.name = "keras"
 
     self._dense = None
     self.input_type = input_type
-    self.dense_shape = (time_steps + 1, 2**n_sites)
     self.variables = []
 
     if optimizer is None:
@@ -50,6 +48,16 @@ class BaseAutoGrad:
 
     self.init_state = tf.convert_to_tensor(init_state[np.newaxis],
                                            dtype=self.output_type)
+
+  @property
+  def shape(self):
+    # This is used in standard (non-tf) machines in order to set the optimizer
+    # and therefore is not needed here.
+    return None
+
+  @property
+  def dense_shape(self) -> Tuple[int, int]:
+    return (self.time_steps + 1, 2**self.n_sites)
 
   @property
   def dense(self) -> np.ndarray:
@@ -102,6 +110,6 @@ class BaseAutoGrad:
   def update(self, grads: List[tf.Tensor]):
     self.optimizer.apply_gradients(zip(grads, self.variables))
 
-  def update_time_step(self, new: np.ndarray, time_step: int):
-    raise NotImplementedError("Step update is not supported in AutoGrad "
-                              "machines.")
+  def add_time_step(self):
+    """Used when growing in time."""
+    raise NotImplementedError

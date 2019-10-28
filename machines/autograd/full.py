@@ -20,6 +20,19 @@ class FullWavefunctionModel(base.BaseAutoGrad):
     psi = tf.reshape(psi, self.dense_shape)
     return tf.concat([self.init_state, psi[1:]], axis=0)
 
+  def add_time_step(self):
+    self.variables = []
+    self.time_steps += 1
+    current_psi = self._dense
+
+    new_shape = (self.time_steps + 1,) + current_psi.shape[1:]
+    new_psi = np.zeros(new_shape, dtype=current_psi.dtype)
+    new_psi[:-1] = np.copy(current_psi)
+    new_psi[-1] = np.copy(current_psi[-1])
+
+    self.psi_re = self.add_variable(new_psi.real)
+    self.psi_im = self.add_variable(new_psi.imag)
+
 
 class FullPropagatorModel(base.BaseAutoGrad):
 
