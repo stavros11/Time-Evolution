@@ -2,22 +2,24 @@
 
 import numpy as np
 from machines import base
-from optimization import deterministic
-from typing import Callable
+from utils import optimizers
+from typing import Tuple
 
 
 class FullWavefunction(base.BaseMachine):
 
-  def __init__(self, init_state: np.ndarray, time_steps: int):
+  def __init__(self, init_state: np.ndarray, time_steps: int,
+               learning_rate: float = 1e-3):
     self.n_states = len(init_state)
-    self.n_sites = int(np.log2(self.n_states))
-    self.time_steps = time_steps
+    n_sites = int(np.log2(self.n_states))
+    super(FullWavefunction, self).__init__("fullwv", n_sites, time_steps)
+
     # Initialize state
     self.psi = np.array((time_steps + 1) * [init_state])
     self.psi = self.psi.reshape((time_steps + 1,) + self.n_sites * (2,))
     self.dtype = self.psi.dtype
-    self.shape = self.psi[1:].shape
-    self.name = "fullwv"
+    self.optimizer = optimizers.AdamComplex(self.shape, dtype=self.dtype,
+                                            alpha=learning_rate)
 
   def set_parameters(self, psi: np.ndarray):
     assert psi.shape == self.psi.shape
@@ -29,8 +31,8 @@ class FullWavefunction(base.BaseMachine):
     return self.psi.reshape((self.time_steps + 1, self.n_states))
 
   @property
-  def deterministic_gradient_func(self) -> Callable:
-    return deterministic.gradient
+  def shape(self) -> Tuple[int]:
+    return self.psi[1:].shape
 
   def wavefunction(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
     # Configs should be in {-1, 1}
@@ -55,11 +57,24 @@ class FullWavefunction(base.BaseMachine):
 
     return grads
 
-  def update(self, to_add: np.ndarray):
+  def update(self, grad: np.ndarray, epoch: int):
+    if grad.shape != self.shape:
+      grad = grad.reshape(self.shape)
+    to_add = self.optimizer(grad, epoch)
     self.psi[1:] += to_add
 
-  def update_time_step(self, new: np.ndarray, time_step: np.ndarray):
-    self.psi[time_step] = new.reshape(self.psi.shape[1:])
+  def add_time_step(self):
+    self.time_steps += 1
+    new_shape = (self.time_steps + 1,) + self.shape[1:]
+    new_psi = np.zeros(new_shape, dtype=self.dtype)
+
+    new_psi[:-1] = np.copy(self.psi)
+    new_psi[-1] = np.copy(self.psi[-1])
+    self.psi = new_psi
+
+    learning_rate = self.optimizer.alpha
+    self.optimizer = optimizers.AdamComplex(self.shape, dtype=self.dtype,
+                                            alpha=learning_rate)
 
 
 class FullWavefunctionNormalized(FullWavefunction):
