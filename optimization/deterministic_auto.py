@@ -70,5 +70,3 @@ def gradient(machine: base.BaseAutoGrad,
 
   grad = tape.gradient(heff_ev, machine.variables)
   return grad, None, heff_ev.numpy(), None
-
-
