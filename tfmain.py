@@ -100,15 +100,14 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
 
   # Set machine
   machine_time_steps = 1 if time_grow_epochs > 0 else time_steps
-  machine = getattr(factory, machine_type)(n_sites=n_sites,
+  machine = getattr(factory, machine_type)(init_state=exact_state[0],
                                            time_steps=machine_time_steps,
-                                           init_state=exact_state[0],
                                            optimizer=optimizer)
 
   ham = tfim.tfim_hamiltonian(n_sites, h=h_ev, pbc=True)
   ham2 = ham.dot(ham)
-  ham_tf = tf.cast(ham, dtype=machine.output_type)
-  ham2_tf = tf.cast(ham2, dtype=machine.output_type)
+  ham_tf = tf.cast(ham, dtype=machine.ctype)
+  ham2_tf = tf.cast(ham2, dtype=machine.ctype)
 
   opt_params = {"n_epochs": n_epochs, "n_message": n_message}
   opt_params["exact_state"] = exact_state

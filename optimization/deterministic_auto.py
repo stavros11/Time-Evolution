@@ -65,7 +65,7 @@ def gradient(machine: base.BaseAutoGrad,
              ) -> Tuple[List[tf.Tensor], None, np.ndarray, None]:
   with tf.GradientTape() as tape:
     tape.watch(machine.variables)
-    full_psi = machine.wavefunction()
+    full_psi = machine.forward_dense()
     heff_ev = energy(full_psi, ham, dt, ham2)
 
   grad = tape.gradient(heff_ev, machine.variables)

@@ -5,22 +5,30 @@ from machines.autograd import base
 
 class FullWavefunctionModel(base.BaseAutoGrad):
 
-  def __init__(self, **kwargs):
-    init_state = kwargs["init_state"]
-    super(FullWavefunctionModel, self).__init__(**kwargs)
-    self.name = "fullwv_autograd"
+  def __init__(self, init_state: np.ndarray, time_steps: int,
+               optimizer: tf.keras.optimizers.Optimizer):
+    n_sites = int(np.log2(len(init_state)))
+    name = "keras_fullwv"
+    super(FullWavefunctionModel, self).__init__(n_sites, time_steps, name,
+                                                optimizer)
 
     # Initialize full wavefunction by repeating the initial state
-    init_value = np.array((self.time_steps + 1) * [init_state]).ravel()
+    init_value = np.array((self.time_steps + 1) * [init_state])
     self.psi_re = self.add_variable(init_value.real)
     self.psi_im = self.add_variable(init_value.imag)
 
-  def forward(self) -> tf.Tensor:
+    self.init_state = tf.convert_to_tensor(init_state[np.newaxis],
+                                           dtype=self.ctype)
+
+  def forward_dense(self) -> tf.Tensor:
     psi = tf.complex(self.psi_re, self.psi_im)
-    psi = tf.reshape(psi, self.dense_shape)
-    return tf.concat([self.init_state, psi[1:]], axis=0)
+    psi = tf.concat([self.init_state, psi[1:]], axis=0)
+    self._dense_cache = psi.numpy()
+    return psi
 
   def add_time_step(self):
+    # FIXME: Update for new conventions
+
     self.variables = []
     self.time_steps += 1
     current_psi = self._dense
@@ -35,6 +43,7 @@ class FullWavefunctionModel(base.BaseAutoGrad):
 
 
 class FullPropagatorModel(base.BaseAutoGrad):
+  # FIXME: Update for new conventions
 
   def __init__(self, **kwargs):
     super(FullPropagatorModel, self).__init__(**kwargs)

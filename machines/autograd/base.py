@@ -5,8 +5,7 @@ Machines are used when optimizing with sampling.
 """
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import optimizers
-from typing import List, Optional, Tuple
+from typing import List
 
 
 class BaseAutoGrad:
@@ -16,100 +15,73 @@ class BaseAutoGrad:
   Optionally redefine `cast_time` if the model takes one-hot times as input.
   """
 
-  def __init__(self, n_sites: int, time_steps: int,
-               init_state: np.ndarray,
-               input_type = tf.float32,
-               optimizer: Optional[optimizers.Optimizer] = None):
-    """Constructs machine given a keras model.
-
-    Args:
-      model_norm: Model that implements the wavefunction norm.
-      model_norm: Model that implements the wavefunction phase.
-        The complex wavefunction uses the polar complex form of norm and phase.
-      n_sites: Number of spin sites.
-      time_steps: Number of time steps (t=0 excluded).
-      name: Name of the machine for saving.
-      optimizer: TensorFlow optimizer to use for optimization.
-    """
+  def __init__(self, n_sites: int, time_steps: int, name: str,
+               optimizer: tf.keras.optimizers.Optimizer):
     # Time steps do not include initial condition
+    self.rtype = None
     self.n_sites = n_sites
+    self.n_states = n_sites ** 2
     self.time_steps = time_steps
-    self.dtype = None
-    self.name = "keras"
+    self.name = name
 
-    self._dense = None
-    self.input_type = input_type
     self.variables = []
+    self.optimizer = optimizer
 
-    if optimizer is None:
-      self.optimizer = optimizers.Adam()
-    else:
-      self.optimizer = optimizer
+    self._forward_log = None # np.ndarray
+    self._dense_cache = None # np.ndarray
 
-    self.init_state = tf.convert_to_tensor(init_state[np.newaxis],
-                                           dtype=self.output_type)
-
-  @property
-  def shape(self):
-    # This is used in standard (non-tf) machines in order to set the optimizer
-    # and therefore is not needed here.
-    return None
-
-  @property
-  def dense_shape(self) -> Tuple[int, int]:
-    return (self.time_steps + 1, 2**self.n_sites)
-
-  @property
-  def dense(self) -> np.ndarray:
-    if self._dense is None:
-      raise ValueError("Cannot call `machine.dense` before calling "
-                       "`machine.wavefunction`.")
-    return self._dense
-
-  @property
-  def output_type(self):
-    if self.input_type == tf.float32:
-      return tf.complex64
-    elif self.input_type == tf.float64:
-      return tf.complex128
-    else:
-      raise TypeError("Input type {} is unknown.".format(self.input_type))
-
-  def add_variable(self, init_value: np.ndarray) -> tf.Tensor:
-    var = tf.Variable(init_value, trainable=True, dtype=self.input_type)
-    self.variables.append(var)
-    return var
-
-  def wavefunction(self) -> tf.Tensor:
-    """Calculates wavefunction value on given samples.
-
-    Note that currently this works only if configs and times are all the
-    possible (exponentially many) states, to avoid using `where` in TensorFlow.
-    We need to fix this if we want to use this with sampling.
-
-    Args:
-      configs: Spin configuration samples of shape (Ns, N)
-      times: Time configuration samples of shape (Ns,)
-
-    Returns:
-      dense wavefunction of shape (T + 1, 2^N)
-    """
-    # TODO: Add a flag in `model` to select one-hot encoding for time
-    # and apply this here
-    psi = self.forward()
-    self._dense = psi.numpy().reshape(self.dense_shape)
-    return psi
-
-  def forward(self) -> tf.Tensor:
+  def forward_log(self, x: tf.Tensor, t: tf.Tensor) -> tf.Tensor:
+    """HAS TO BE IMPLEMENTED WHEN INHERITING"""
+    self._forward_log = None # np.ndarray
     raise NotImplementedError
 
-  def gradient(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
-    raise NotImplementedError("Gradient method is not supported in AutoGrad "
-                              "machines.")
+  def forward_dense(self) -> tf.Tensor:
+    """HAS TO BE IMPLEMENTED WHEN INHERITING"""
+    self._dense_cache = None # np.ndarray
+    raise NotImplementedError
 
   def update(self, grads: List[tf.Tensor]):
     self.optimizer.apply_gradients(zip(grads, self.variables))
+    self._forward_cache = None
+    self._dense_cache = None
 
-  def add_time_step(self):
-    """Used when growing in time."""
-    raise NotImplementedError
+  def add_variable(self, init_value: np.ndarray) -> tf.Tensor:
+    tftype = self.np_to_tf_type(init_value.dtype)
+    if self.rtype is None:
+      self.rtype = tftype
+    else:
+      assert tftype == self.rtype
+
+    var = tf.Variable(init_value, trainable=True, dtype=self.rtype)
+    self.variables.append(var)
+    return var
+
+  @property
+  def ctype(self):
+    if self.rtype == tf.float32:
+      return tf.complex64
+    elif self.rtype == tf.float64:
+      return tf.complex128
+    else:
+      raise TypeError("Unknown complex type.")
+
+  @staticmethod
+  def np_to_tf_type(nptype):
+    if nptype == np.float32:
+      return tf.float32
+    elif nptype == np.float64:
+      return tf.float64
+    else:
+      raise TypeError("Cannot conver numpy type to tensorflow.")
+
+  @property
+  def dense(self) -> np.ndarray:
+    if self._dense_cache is None:
+      self.forward_dense()
+    return self._dense_cache
+
+  @property
+  def log(self) -> np.ndarray:
+    if self._forward_log is None:
+      raise ValueError("Log cache is unavailable before calling forward.")
+    return self._forward_log
