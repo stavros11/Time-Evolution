@@ -20,7 +20,7 @@ class BaseAutoGrad:
     # Time steps do not include initial condition
     self.rtype = None
     self.n_sites = n_sites
-    self.n_states = n_sites ** 2
+    self.n_states = 2 ** n_sites
     self.time_steps = time_steps
     self.name = name
 
