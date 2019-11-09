@@ -19,16 +19,29 @@ class FullWavefunctionModel(base.BaseAutoGrad):
 
     self.init_state = tf.convert_to_tensor(init_state[np.newaxis],
                                            dtype=self.ctype)
+    self.bin2dec = tf.convert_to_tensor(2**np.arange(self.n_sites),
+                                        dtype=tf.int32)[:, tf.newaxis]
+    self._dense_tfcache = None
 
   def forward_dense(self) -> tf.Tensor:
     psi = tf.complex(self.psi_re, self.psi_im)
     psi = tf.concat([self.init_state, psi[1:]], axis=0)
+
     self._dense_cache = psi.numpy()
+    self._dense_tfcache = tf.reshape(
+        tf.math.log(psi), ((self.time_steps + 1) * self.n_states,))
+
     return psi
+
+  def forward_log(self, x: tf.Tensor, t: tf.Tensor) -> tf.Tensor:
+    if self._dense_tfcache is None:
+      self.forward_dense()
+    ids = tf.matmul(tf.math.maximum(0, x), self.bin2dec)[:, 0]
+    ids += self.n_states * t
+    return tf.gather(self._dense_tfcache, ids)
 
   def add_time_step(self):
     # FIXME: Update for new conventions
-
     self.variables = []
     self.time_steps += 1
     current_psi = self._dense
