@@ -23,7 +23,7 @@ file = [h5py.File("{}/ClockV3/histories/allstates_tf2_withoverlap_fullwv_N{}M{}.
         for time_steps in T_list]
 #n_epochs = len(file[-1]["time_overlaps"][()])
 n_epochs = 20000
-step = 1000
+step = 400
 
 exact_file = h5py.File("{}/ClockV3/observables/fullwv_tf2_N{}.h5".format(data_dir, n_sites), "r")
 exact_sigma_x = exact_file["metrics/exact/sigma_x/{}".format(3)][()]
@@ -63,6 +63,8 @@ for i, epoch in enumerate(range(0, n_epochs, step)):
   plt.ylabel(r"Norm(t) $- 1$")
   plt.ylim([1e-5, 10.0])
 
+  if epoch % step == 0:
+    print("{} / {}".format(epoch, n_epochs))
 
   #plt.show()
   plt.savefig("optimization_dynamic-{}.png".format(i))
