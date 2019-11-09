@@ -27,12 +27,10 @@ class BaseAutoGrad:
     self.variables = []
     self.optimizer = optimizer
 
-    self._forward_log = None # np.ndarray
     self._dense_cache = None # np.ndarray
 
   def forward_log(self, x: tf.Tensor, t: tf.Tensor) -> tf.Tensor:
     """HAS TO BE IMPLEMENTED WHEN INHERITING"""
-    self._forward_log = None # np.ndarray
     raise NotImplementedError
 
   def forward_dense(self) -> tf.Tensor:
@@ -79,9 +77,3 @@ class BaseAutoGrad:
     if self._dense_cache is None:
       self.forward_dense()
     return self._dense_cache
-
-  @property
-  def log(self) -> np.ndarray:
-    if self._forward_log is None:
-      raise ValueError("Log cache is unavailable before calling forward.")
-    return self._forward_log

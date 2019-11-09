@@ -22,7 +22,7 @@ class SpinTime:
 
     def log_prob(x: tf.Tensor) -> tf.Tensor:
       psi = machine.forward_log(x[tf.newaxis, :-1], x[tf.newaxis, -1])
-      return tf.square(tf.abs(psi[0]))
+      return tf.math.real(psi[0])
 
     def new_state(x: tf.Tensor, seed: int) -> tf.Tensor:
       old_state = x[0]
@@ -39,11 +39,12 @@ class SpinTime:
                                                 new_state_fn=new_state)
 
   def __call__(self):
-    samples, _ = tfp.mcmc.sample_chain(
+    samples = tfp.mcmc.sample_chain(
         num_results=self.n_samples,
         num_burnin_steps=self.n_burn,
         current_state=self.init_state,
         kernel=self.kernel,
+        trace_fn=None,
         parallel_iterations=4)
 
     self.init_state = samples[-1]
