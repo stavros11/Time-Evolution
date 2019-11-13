@@ -49,11 +49,13 @@ parser.add_argument("--n-epochs", default=0, type=int,
 parser.add_argument("--n-message", default=500, type=int,
                     help="Every how many epochs to display messages.")
 
-# Sweeping parms
+# Sweeping params
 parser.add_argument("--n-sweeps", default=0, type=int,
                     help="Number of sweeps.")
 parser.add_argument("--sweep-epochs", default=1000, type=int,
                     help="Number of epochs for each time step during time growing.")
+parser.add_argument("--grow-tree", action="store_true",
+                    help="Grow in time using a tree like structure.")
 parser.add_argument("--binary-sweeps", action="store_true",
                     help="Do binary sweeps instead of normal.")
 parser.add_argument("--sweep-both-directions", action="store_true",
@@ -89,6 +91,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          init_state: Optional[np.ndarray] = None,
          n_sweeps: int = 0,
          sweep_epochs: int = 1000,
+         grow_tree: bool = False,
          binary_sweeps: bool = False,
          sweep_both_directions: bool = False,
          **machine_params):
@@ -162,10 +165,16 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
     global_optimizer.keywords["detenergy_func"] = functools.partial(
         deterministic.energy, ham=ham, dt=dt, ham2=ham2)
 
-    print("Performing sweeps with {} epochs.".format(sweep_epochs))
-    sweep_history, machine = optimize.sweep(machine, global_optimizer,
-                                            n_sweeps, binary_sweeps,
-                                            sweep_both_directions)
+    if grow_tree:
+      assert n_sweeps == 1
+      print("Growing time in a tree structure.")
+      sweep_history, machine = optimize.tree(machine, global_optimizer)
+
+    else:
+      print("Performing sweeps with {} epochs.".format(sweep_epochs))
+      sweep_history, machine = optimize.sweep(machine, global_optimizer,
+                                              n_sweeps, binary_sweeps,
+                                              sweep_both_directions)
 
   # Optimize globally
   if n_epochs > 0:

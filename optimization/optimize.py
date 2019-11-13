@@ -187,3 +187,63 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
         print("{}: {}".format(k, val[-1]))
 
   return history, machine
+
+
+def level_generator(n: int) -> List[int]:
+  """Helper method for `tree`.
+
+  Assumes `n` is a power of 2.
+  """
+  # Assumes n is a power of 2.
+  left = list(range(0, n // 2))
+  right = list(range(n // 2, n))
+  while len(left) != 1:
+    yield left + right
+    left = left[::2]
+    right = right[1::2]
+  yield left + right
+
+
+def tree(machine: base.BaseMachine, global_optimizer: Callable,
+         ) -> Tuple[Dict[str, List[float]], base.BaseMachine]:
+  _MAX_EPOCHS = 10000
+
+  n_levels = np.log2(machine.time_steps + 1)
+  if not n_levels.is_integer():
+    raise ValueError("Number of time steps (+1) must be a power of 2 when "
+                     "using tree optimization.")
+  level_subset_lists = list(level_generator(machine.time_steps + 1))[::-1]
+  assert len(level_subset_lists) == int(n_levels)
+
+  history = {"tree_exact_Eloc": []}
+  if "exact_state" in global_optimizer.keywords:
+    n = len(global_optimizer.keywords["exact_state"])
+    assert n == machine.time_steps + 1
+    history["tree_overlaps"] = []
+    history["tree_avg_overlaps"] = []
+
+  # Read t_final because it is required to calculate dt as we change tree levels
+  dt = global_optimizer.keywords["grad_func"].keywords["dt"]
+  t_final = machine.time_steps * dt
+
+  for level, subset in enumerate(level_subset_lists):
+    if level > 0:
+      # Set new initial conditions
+      machine.set_parameters(machine.tensors[subset[::2]], subset[1::2])
+
+    # Increase number of optimization epochs as we go deeper in the tree
+    if global_optimizer.keywords["n_epochs"] < _MAX_EPOCHS:
+      global_optimizer.keywords["n_epochs"] *= 2
+
+    # Tune dt according to the current number of time steps
+    n_steps = len(subset)
+    global_optimizer.keywords["grad_func"].keywords["dt"] = t_final / n_steps
+    step_history, machine = global_optimizer(machine, subset_time_steps=subset)
+
+    print("\nTree level: {}".format(level + 1))
+    print("Number of time steps: {}".format(n_steps))
+    for k, val in step_history.items():
+      history["tree_{}".format(k)].append(val)
+      print("{}: {}".format(k, val[-1]))
+
+  return history, machine
