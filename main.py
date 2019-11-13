@@ -187,6 +187,9 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   # are going to save
   history.update(sweep_history)
 
+  # TODO: (NOT A PRIORITY) Fix saving when using tree growing
+  # (not easy since time steps change at each level)
+
   # Save training histories and final wavefunction
   filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
   saving.save_histories(data_dir, filename, history)

@@ -217,19 +217,20 @@ def tree(machine: base.BaseMachine, global_optimizer: Callable,
 
   history = {"tree_exact_Eloc": []}
   if "exact_state" in global_optimizer.keywords:
-    n = len(global_optimizer.keywords["exact_state"])
-    assert n == machine.time_steps + 1
+    exact_state = np.copy(global_optimizer.keywords["exact_state"])
+    assert len(exact_state) == machine.time_steps + 1
     history["tree_overlaps"] = []
     history["tree_avg_overlaps"] = []
 
   # Read t_final because it is required to calculate dt as we change tree levels
   dt = global_optimizer.keywords["grad_func"].keywords["dt"]
+  global_optimizer.keywords.pop("detenergy_func")
   t_final = machine.time_steps * dt
 
   for level, subset in enumerate(level_subset_lists):
-    if level > 0:
-      # Set new initial conditions
-      machine.set_parameters(machine.tensors[subset[::2]], subset[1::2])
+    # Define subset machine
+    subset_machine = machine.subset(subset, machine)
+    global_optimizer.keywords["exact_state"] = exact_state[subset]
 
     # Increase number of optimization epochs as we go deeper in the tree
     if global_optimizer.keywords["n_epochs"] < _MAX_EPOCHS:
@@ -238,7 +239,10 @@ def tree(machine: base.BaseMachine, global_optimizer: Callable,
     # Tune dt according to the current number of time steps
     n_steps = len(subset)
     global_optimizer.keywords["grad_func"].keywords["dt"] = t_final / n_steps
-    step_history, machine = global_optimizer(machine, subset_time_steps=subset)
+    step_history, subset_machine = global_optimizer(subset_machine)
+
+    # Update actual machine
+    machine.set_parameters(subset_machine.tensors, subset)
 
     print("\nTree level: {}".format(level + 1))
     print("Number of time steps: {}".format(n_steps))
