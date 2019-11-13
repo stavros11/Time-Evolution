@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser()
 # Directories
 parser.add_argument("--data-dir", default="/home/stavros/DATA/ClockV3/",
                     type=str, help="Basic directory that data is saved.")
-parser.add_argument("--save-name", default="all_states", type=str,
+parser.add_argument("--save-name", default="allstates", type=str,
                     help="Name to use for distinguish the saved training data.")
 
 # System params
@@ -44,19 +44,20 @@ parser.add_argument("--machine-type", default="FullWavefunction",
                     help="Machine name as is imported in machines.factory.")
 parser.add_argument("--learning-rate", default=1e-3, type=float,
                     help="Adam optimizer learning rate.")
-parser.add_argument("--n-epochs", default=10000, type=int,
+parser.add_argument("--n-epochs", default=0, type=int,
                     help="Number of epochs to train for.")
 parser.add_argument("--n-message", default=500, type=int,
                     help="Every how many epochs to display messages.")
 
 # Sweeping parms
-parser.add_argument("--time-grow-epochs", default=0, type=int,
-                    help="Number of epochs for each time step during time growing.")
 parser.add_argument("--n-sweeps", default=0, type=int,
                     help="Number of sweeps.")
+parser.add_argument("--sweep-epochs", default=1000, type=int,
+                    help="Number of epochs for each time step during time growing.")
+parser.add_argument("--binary-sweeps", action="store_true",
+                    help="Do binary sweeps instead of normal.")
 parser.add_argument("--sweep-both-directions", action="store_true",
                     help="Whether to sweep back and forth or only forward.")
-# Note that `time-grow-epochs` are also used when sweeping!
 
 # Sampling params
 parser.add_argument("--n-samples", default=0, type=int,
@@ -86,8 +87,9 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          n_message: Optional[int] = None,
          h_init: Optional[float] = None,
          init_state: Optional[np.ndarray] = None,
-         time_grow_epochs: int = 0,
          n_sweeps: int = 0,
+         sweep_epochs: int = 1000,
+         binary_sweeps: bool = False,
          sweep_both_directions: bool = False,
          **machine_params):
   """Main optimization script.
@@ -112,7 +114,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
     raise ValueError("Exactly one of `h_init` and `init_state` should "
                      "be specified.")
 
-  if time_grow_epochs > 0 and n_samples > 0:
+  if n_sweeps > 0 and n_samples > 0:
     raise NotImplementedError("Sweeping optimization is not implemented with "
                               "sampling.")
     # Note that in order to implement sweeping with sampling we should
@@ -130,15 +132,12 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   machine_params = {k: p for k, p in machine_params.items() if p is not None}
   machine_params["init_state"] = exact_state[0]
   machine_params["learning_rate"] = learning_rate
-  if time_grow_epochs > 0:
-    machine_params["time_steps"] = 1
-  else:
-    machine_params["time_steps"] = time_steps
-  machine = getattr(factory, machine_type)(**machine_params)
+  machine_params["time_steps"] = time_steps
+  machine = getattr(factory, machine_type).create(**machine_params)
+  print("{} machine initialized.".format(machine.name))
 
   ham2 = ham.dot(ham)
-  opt_params = {"exact_state": exact_state, "n_epochs": n_epochs,
-                "n_message": n_message}
+  opt_params = {"exact_state": exact_state}
   # Set gradient and deterministic energy calculation functions
   if n_samples > 0:
     opt_params["grad_func"] = functools.partial(sampling.gradient, dt=dt, h=h_ev)
@@ -152,32 +151,31 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
     opt_params["grad_func"] = functools.partial(gradient_func,
                 ham=ham, dt=dt, ham2=ham2)
 
-  grow_history, sweep_history, history = {}, {}, {}
+  sweep_history, history = {}, {}
   # Set optimization function
   global_optimizer = functools.partial(optimize.globally, **opt_params)
   # Grow in time
-  if time_grow_epochs > 0:
-    global_optimizer.keywords["n_epochs"] = time_grow_epochs
-    grow_history, machine = optimize.grow(machine, time_steps, global_optimizer)
-    global_optimizer.keywords["exact_state"] = exact_state
-    if n_sweeps > 0:
-      sweep_history, machine = optimize.sweep(machine, global_optimizer,
-                                              n_sweeps, sweep_both_directions)
+  if n_sweeps > 0:
+    assert sweep_epochs > 0
+    global_optimizer.keywords["n_epochs"] = sweep_epochs
+    # Pass a detenergy function in order to calculate Eloc using the full state
+    global_optimizer.keywords["detenergy_func"] = functools.partial(
+        deterministic.energy, ham=ham, dt=dt, ham2=ham2)
 
-    # Reset `global_optimizer` keywords in case we want to continue with
-    # global optimization after growing time
-    global_optimizer.keywords["n_epochs"] = n_epochs
-    global_optimizer.keywords["n_message"] = n_message
-    # Disable gradient mask to update all time steps
-    global_optimizer.keywords["index_to_update"] = None
+    print("Performing sweeps with {} epochs.".format(sweep_epochs))
+    sweep_history, machine = optimize.sweep(machine, global_optimizer,
+                                            n_sweeps, binary_sweeps,
+                                            sweep_both_directions)
 
   # Optimize globally
   if n_epochs > 0:
+    global_optimizer.keywords["n_epochs"] = n_epochs
+    global_optimizer.keywords["n_message"] = n_message
+    print("\nPerforming global optimization for {} epochs".format(n_epochs))
     history, machine = global_optimizer(machine)
 
   # Add growing and sweeping histories to the history dictionary that we
   # are going to save
-  history.update(grow_history)
   history.update(sweep_history)
 
   # Save training histories and final wavefunction
