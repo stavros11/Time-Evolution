@@ -67,7 +67,7 @@ plt.ylabel(r"$1 - \overline{\mathrm{Fid}(t)}$", fontsize=17)
 
 if save:
   script_name = __file__.split("/")[-1].split(".")[0]
-  save_name = [script_name, machine, "N{}.pdf".format(n_sites)]
+  save_name = [script_name, machine, "N{}M{}.pdf".format(n_sites, time_steps)]
   plt.savefig("_".join(save_name), bbox_inches="tight")
 else:
   plt.show()
