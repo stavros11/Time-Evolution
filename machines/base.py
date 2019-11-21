@@ -113,7 +113,7 @@ class BaseMachine:
     psi_after = self.dense_tensor[(times_after,) + configs_sl]
     return np.stack((psi_before, psi_now, psi_after))
 
-  def update(self, grad: np.ndarray, epoch: int):
+  def update(self, grad: np.ndarray, epoch: int, update_zero: bool = False):
     """Updates variational parameters.
 
     Args:
@@ -123,7 +123,10 @@ class BaseMachine:
     if grad.shape != self.shape:
       grad = grad.reshape(self.shape)
     to_add = self.optimizer(grad, epoch)
-    self.tensors[1:] += to_add
+    if update_zero:
+      self.tensors[0] += to_add[0]
+    else:
+      self.tensors[1:] += to_add
     self._dense = None
 
   @classmethod
