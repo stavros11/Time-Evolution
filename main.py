@@ -19,7 +19,7 @@ from typing import Optional
 
 parser = argparse.ArgumentParser()
 # Directories
-parser.add_argument("--data-dir", default="/home/stavros/DATA/ClockV3/",
+parser.add_argument("--data-dir", default="/home/stavros/DATA/MPQ/ClockV5/",
                     type=str, help="Basic directory that data is saved.")
 parser.add_argument("--save-name", default="allstates", type=str,
                     help="Name to use for distinguish the saved training data.")

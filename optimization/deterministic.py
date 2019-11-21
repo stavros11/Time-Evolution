@@ -124,8 +124,8 @@ def gradient(machine: base.BaseMachine,
   Ok = np.conj(full_psi) / phi_phi
   Ok_star_Eloc = Heff_samples / phi_phi
   if psi0 is None:
-    Ok = Ok[1:]
-    Ok_star_Eloc = Ok_star_Eloc[1:]
+    Ok = Ok
+    Ok_star_Eloc = Ok_star_Eloc
 
   return Ok, Ok_star_Eloc, Eloc, Eloc_terms
 
@@ -166,4 +166,4 @@ def sampling_gradient(machine: base.BaseMachine,
   Heff_samples = Heff_samples / full_psi
   Ok_star_Eloc = (np.conj(weights) * Heff_samples[slicer]).sum(axis=1) / phi_phi
 
-  return Ok[1:], Ok_star_Eloc[1:], Eloc, Eloc_terms
+  return Ok, Ok_star_Eloc, Eloc, Eloc_terms

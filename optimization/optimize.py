@@ -19,7 +19,8 @@ def globally(machine: base.BaseMachine,
              detenergy_func: Optional[Callable[[np.ndarray], float]] = None,
              n_message: Optional[int] = None,
              index_to_update: Optional[int] = None,
-             subset_time_steps: Optional[List[int]] = None
+             subset_time_steps: Optional[List[int]] = None,
+             update_time_zero: bool = False
              ) -> Tuple[Dict[str, List[float]], base.BaseMachine]:
   """Optimizes the Clock Hamiltonian for a machine globally.
 
@@ -73,6 +74,12 @@ def globally(machine: base.BaseMachine,
 
     # Calculate gradients
     grad = Ok_star_Eloc - Ok.conj() * Eloc
+    if update_time_zero:
+      assert index_to_update is None
+      grad = grad[0][np.newaxis]
+    else:
+      grad = grad[1:]
+
     if index_to_update is not None:
       assert index_to_update < machine_to_update.time_steps
       new_grad = np.zeros_like(grad)
@@ -80,7 +87,7 @@ def globally(machine: base.BaseMachine,
       grad = new_grad
 
     # Update machine
-    machine_to_update.update(grad, epoch)
+    machine_to_update.update(grad, epoch, update_time_zero)
     if subset_time_steps is not None:
       machine.set_parameters(machine_to_update.tensors, subset_time_steps)
 
@@ -146,6 +153,9 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
     history["sweeping_avg_overlaps"] = []
 
   if binary:
+    #if not both_directions:
+    #  raise ValueError("It doesn't make sense to do binary sweeps without "
+    #                   "using both directions.")
     print("Performing binary sweeps.")
   if both_directions and n_sweeps > 1:
     print("Sweeping both directions")
@@ -160,11 +170,10 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
 
     for time_step in time_iter:
       if binary:
-        # FIXME: This is not entirely proper when sweeping from T --> 1 but
-        # I am not sure if there is an easy fix and it is not super important
-        # to spend time on this currently
+        update_zero = both_directions and (i % 2 == 1)
         step_history, machine = global_optimizer(
-            machine, subset_time_steps=[time_step, time_step + 1])
+            machine, subset_time_steps=[time_step, time_step + 1],
+            update_time_zero=update_zero)
 
       else:
         if i > 0:
