@@ -10,9 +10,9 @@ class SmallMPSModel(base.BaseAutoGrad):
   def __init__(self, **kwargs):
     init_state = kwargs["init_state"]
     super(SmallMPSModel, self).__init__(**kwargs)
-    self.name = "smallmps_autograd"
     self.d_phys = 2
     self.d_bond = 4
+    self.name = "smallmpsD{}_autograd".format(self.d_bond)
     self.n_states = self.d_phys**self.n_sites
     self._create_variables(init_state)
 
@@ -57,7 +57,7 @@ class SmallMPSProductPropModel(SmallMPSModel):
 
   def __init__(self, **kwargs):
     super(SmallMPSProductPropModel, self).__init__(**kwargs)
-    self.name = "smallmps_prodprop"
+    self.name = "smallmpsD{}_prodprop".format(self.d_bond)
 
   def _create_variables(self, init_state: np.ndarray):
     n = self.d_phys * self.d_bond**2
