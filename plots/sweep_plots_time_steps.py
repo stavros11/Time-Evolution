@@ -11,20 +11,23 @@ matplotlib.rcParams["font.size"] = 26
 cp = sns.color_palette()
 
 
-data_dir = "D:/ClockV5/histories"
+#data_dir = "D:/ClockV5/histories"
+data_dir = "/home/stavros/DATA/MPQ/ClockV5/histories"
 ylabels = {"sweeping_exact_Eloc": "$E_\mathrm{loc}$",
            "sweeping_avg_overlaps": r"$1 - \overline{\mathrm{Fid}(t)}$"}
 
 
 quantity = ["sweeping_exact_Eloc", "sweeping_avg_overlaps"][1]
 name = "allstates2"
-machine = "fullwv"
-n_sites = 6
-time_steps_list = [30]
-#time_steps_list = [5, 10, 15, 20, 30]
+machine = ["fullwv", "mpsD4"][0]
+#time_steps_list = [30]
+time_steps_list = [10, 20, 30]
 n_sweeps = 10
+
 skip_grow = True
 save = False
+
+n_sites = 6
 
 
 def get_filedir(time_steps: int) -> str:
