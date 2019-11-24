@@ -136,6 +136,19 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   machine = getattr(factory, machine_type).create(**machine_params)
   print("{} machine initialized.".format(machine.name))
 
+
+  sweep_state = np.load("/home/stavros/DATA/MPQ/ClockV5/final_dense/allstates1_binary_nsweeps10_mpsD4_N6M20.npy")
+  if machine_type == "SmallMPS":
+    d_bond = machine_params["d_bond"]
+    from utils.mps import mps as mps_utils
+    tensors = [mps_utils.dense_to_mps(state, d_bond) for state in sweep_state]
+    tensors = np.array(tensors).swapaxes(2, 3)
+    machine.set_parameters(tensors)
+  elif machine_type == "FullWavefunction":
+    tensors = sweep_state.reshape(machine.tensors.shape)
+    machine.set_parameters(tensors)
+
+
   ham2 = ham.dot(ham)
   opt_params = {"exact_state": exact_state}
   # Set gradient and deterministic energy calculation functions
