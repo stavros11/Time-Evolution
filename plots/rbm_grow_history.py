@@ -7,7 +7,7 @@ import matplotlib
 import seaborn as sns
 matplotlib.rcParams['mathtext.fontset'] = 'cm'
 matplotlib.rcParams['font.family'] = 'STIXGeneral'
-matplotlib.rcParams["font.size"] = 26
+matplotlib.rcParams["font.size"] = 22
 cp = sns.color_palette()
 from mpl_toolkits.axes_grid import inset_locator
 
@@ -15,7 +15,7 @@ from mpl_toolkits.axes_grid import inset_locator
 data_dir = "D:/ClockV5/histories"
 #data_dir = "/home/stavros/DATA/MPQ/ClockV4/histories"
 
-save = False
+save = True
 n_sites = 6
 time_steps = 20
 
@@ -34,23 +34,33 @@ global_overlaps = data["avg_overlaps"][()].real
 data.close()
 
 
+global_heff[0] = grow_heff[0]
+
+
 fig, ax = plt.subplots(figsize=(7, 4))
 ax.semilogy(grow_heff, color=cp[0], linewidth=2.4, label="Grow")
 ax.semilogy(global_heff, color=cp[1], linewidth=2.4, label="Global")
 plt.xlabel("Epochs")
 plt.ylabel(r"$\left \langle H_\mathrm{eff}\right \rangle $")
 #plt.legend(bbox_to_anchor=(1.0, 1.0), fontsize=22)
-plt.legend(fontsize=20, loc="upper left")
+plt.legend(fontsize=20, loc="upper right")
 
-inset_axes = inset_locator.inset_axes(ax, width="50%", height="50%", loc="upper right")
-plt.semilogy(1 - grow_overlaps, color=cp[0], linewidth=2.4)
-plt.semilogy(1 - global_overlaps, color=cp[1], linewidth=2.4)
-plt.xticks([])
-plt.yticks([])
-#inset_axes.xaxis.set_label_coords(0.8,0.185)
-#inset_axes.yaxis.set_label_coords(0.16,0.4)
-##plt.xlabel("Epochs")
-plt.ylabel(r"$1 - \overline{\mathrm{Fid}(t)}$", fontsize=17)
+
+#ax.semilogy(1 - grow_overlaps, color=cp[0], linewidth=2.4, label="Grow")
+#ax.semilogy(1 - global_overlaps, color=cp[1], linewidth=2.4, label="Global")
+#plt.xlabel("Epochs")
+#plt.ylabel(r"$1 - \overline{\mathrm{Fid}(t)}$")
+
+
+#inset_axes = inset_locator.inset_axes(ax, width="50%", height="50%", loc="upper right")
+#plt.semilogy(1 - grow_overlaps, color=cp[0], linewidth=2.4)
+#plt.semilogy(1 - global_overlaps, color=cp[1], linewidth=2.4)
+#plt.xticks([])
+#plt.yticks([])
+##inset_axes.xaxis.set_label_coords(0.8,0.185)
+##inset_axes.yaxis.set_label_coords(0.16,0.4)
+###plt.xlabel("Epochs")
+#plt.ylabel(r"$1 - \overline{\mathrm{Fid}(t)}$", fontsize=17)
 
 
 if save:
