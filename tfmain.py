@@ -168,7 +168,7 @@ if __name__ == '__main__':
   #args.binary_sweeps = True
 
   # Global params
-  args.n_epochs = 10000
+  args.n_epochs = 20000
 
   args.save_name = "allstates1_global_autograd"
 
