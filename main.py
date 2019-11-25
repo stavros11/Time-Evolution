@@ -137,7 +137,9 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   print("{} machine initialized.".format(machine.name))
 
 
-  sweep_state = np.load("/home/stavros/DATA/MPQ/ClockV5/final_dense/allstates1_binary_nsweeps10_mpsD4_N6M20.npy")
+  #state_dir = "/home/stavros/DATA/MPQ/ClockV5/final_dense/allstates1_binary_nsweeps10_mpsD4_N6M20.npy"
+  state_dir = "D:/ClockV5/final_dense/allstates_mpsD4_N6M20.npy"
+  sweep_state = np.load(state_dir)
   if machine_type == "SmallMPS":
     d_bond = machine_params["d_bond"]
     from utils.mps import mps as mps_utils
