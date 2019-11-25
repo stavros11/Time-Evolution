@@ -20,12 +20,12 @@ global_quantities = {"sweeping_exact_Eloc": 0.0018196748798055369,
 data_dir = "D:/ClockV5/histories"
 #data_dir = "/home/stavros/DATA/MPQ/ClockV5/histories"
 
-machine = ["fullwv", "mpsD4"][1]
-save = True
+machine = ["fullwv", "mpsD4"][0]
+save = False
 n_sites = 6
 time_steps = 20
 n_sweeps = 10
-quantity = ["sweeping_exact_Eloc", "sweeping_avg_overlaps"][1]
+quantity = ["sweeping_exact_Eloc", "sweeping_avg_overlaps"][0]
 
 
 filename = ["allstates1_binary", "nsweeps{}".format(n_sweeps),
@@ -33,6 +33,8 @@ filename = ["allstates1_binary", "nsweeps{}".format(n_sweeps),
 data = h5py.File(os.path.join(data_dir, "_".join(filename)), "r")
 if "overlaps" in quantity:
   sweep_data = 1 - data[quantity][()].ravel()
+else:
+  sweep_data = data[quantity][()].ravel()
 data.close()
 
 cut_ind = 1000 * 20
@@ -51,8 +53,8 @@ plt.xticks(list(range(n_sweeps + 1)))
 
 inset_axes = inset_locator.inset_axes(ax, width="50%", height="50%", loc="upper right")
 plt.plot(x_values[cut_ind:], sweep_data[cut_ind:], color=cp[0], linewidth=2.4)
-if "overlaps" not in quantity:
-  plt.axhline(y=global_quantities[quantity], color=cp[1], linewidth=2.0)
+#if "overlaps" not in quantity:
+#  plt.axhline(y=global_quantities[quantity], color=cp[1], linewidth=2.0)
 plt.xticks(list(range(1, n_sweeps + 1)), fontsize=18)
 plt.yticks([])
 
