@@ -164,7 +164,7 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
   for i in range(n_sweeps):
     print("\nSweep {} / {}".format(i + 1, n_sweeps))
     if both_directions and i % 2 == 1:
-      time_iter = range(machine.time_steps - 1, -1, -1)
+      time_iter = range(machine.time_steps - 1, 0, -1)
     else:
       time_iter = range(machine.time_steps)
 
