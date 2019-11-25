@@ -20,7 +20,7 @@ save = True
 n_sites = 6
 time_steps = 20
 d_bond_list = [2, 3, 4, 5, 6]
-quantity = ["exact_Eloc", "avg_overlaps"][1]
+quantity = ["exact_Eloc", "avg_overlaps"][0]
 
 
 def get_quantity(name, d_bond, sweeping, sweep_ind=-1):
@@ -51,10 +51,10 @@ for d_bond in d_bond_list:
 fig, ax = plt.subplots(figsize=(7, 4))
 ax.semilogy(d_bond_list, glob, color=cp[1], linewidth=2.4,
             label="Global", marker="o", markersize=8)
-ax.semilogy(d_bond_list, grow, color=cp[0], linewidth=2.4,
-            label="Grow", marker="d", markersize=8)
+ax.semilogy(d_bond_list, grow, color=cp[0], linewidth=2.5,
+            label="Grow", marker="^", markersize=8)
 ax.semilogy(d_bond_list, sweep, color=cp[2], linewidth=2.4,
-            label="Sweep", marker="s", markersize=8)
+            label="Sweep", marker="v", markersize=8, linestyle="--")
 plt.xlabel("$D$")
 plt.ylabel(ylabels[quantity])
 if "overlaps" not in quantity:
