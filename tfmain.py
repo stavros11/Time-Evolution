@@ -9,6 +9,7 @@ import numpy as np
 import tensorflow as tf
 
 from machines.autograd import factory
+from optimization import deterministic
 from optimization import deterministic_auto
 from optimization import optimize
 from utils import saving
@@ -40,9 +41,11 @@ parser.add_argument("--h-init", default=1.0, type=float,
 # Training params
 parser.add_argument("--machine-type", default="FullWavefunction",
                     type=str, help="Machine name defined in `autograd.py`.")
-parser.add_argument("--n-epochs", default=10000, type=int,
+parser.add_argument("--n-epochs", default=0, type=int,
                     help="Number of epochs to train for.")
-parser.add_argument("--time-grow-epochs", default=0, type=int,
+parser.add_argument("--n-sweeps", default=0, type=int,
+                    help="Number of sweeps.")
+parser.add_argument("--sweep-epochs", default=1000, type=int,
                     help="Number of epochs for each time step during time growing.")
 parser.add_argument("--learning-rate", default=1e-3, type=float,
                     help="Adam optimizer learning rate.")
@@ -70,7 +73,8 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          n_message: Optional[int] = None,
          h_init: Optional[float] = None,
          init_state: Optional[np.ndarray] = None,
-         time_grow_epochs: int = 0):
+         n_sweeps: int = 0,
+         sweep_epochs: int = 0):
   """Main optimization script.
 
   Args:
@@ -99,7 +103,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
   # Set machine
-  machine_time_steps = 1 if time_grow_epochs > 0 else time_steps
+  machine_time_steps = 1 if n_sweeps > 0 else time_steps
   machine = getattr(factory, machine_type)(n_sites=n_sites,
                                            time_steps=machine_time_steps,
                                            init_state=exact_state[0],
@@ -123,10 +127,12 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   # Set optimization function
   global_optimizer = functools.partial(optimize.globally, **opt_params)
   # Grow in time
-  if time_grow_epochs > 0:
-    global_optimizer.keywords["n_epochs"] = time_grow_epochs
+  if n_sweeps > 0:
+    global_optimizer.keywords["n_epochs"] = sweep_epochs
+    # Pass a detenergy function in order to calculate Eloc using the full state
+    global_optimizer.keywords["detenergy_func"] = functools.partial(
+        deterministic.energy, ham=ham, dt=dt, ham2=ham2)
     grow_history, machine = optimize.grow(machine, time_steps, global_optimizer)
-    global_optimizer.keywords["exact_state"] = exact_state
 
     # Reset `global_optimizer` keywords in case we want to continue with
     # global optimization after growing time
@@ -146,4 +152,24 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
 
 if __name__ == '__main__':
   args = parser.parse_args()
+
+  args.data_dir = "D:/ClockV5/"
+  args.time_steps = 20
+  args.t_final = 1.0
+
+  # Machine params
+  #args.machine_type = "FullWavefunction"
+  args.machine_type = "SmallRBM"
+
+  # Growing & sweep params
+  args.sweep_epochs = 1000
+  args.n_sweeps = 1
+  #args.sweep_both_directions = True
+  #args.binary_sweeps = True
+
+  # Global params
+  #args.n_epochs = 10000
+
+  args.save_name = "allstates1_grow_autograd"
+
   main(**vars(args))

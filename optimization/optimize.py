@@ -50,7 +50,8 @@ def globally(machine: base.BaseMachine,
   """
   history = {"exact_Eloc": []}
   if exact_state is not None:
-    assert len(exact_state) == machine.time_steps + 1
+    # FIXME: Uncomment this assertion (see bellow)
+    #assert len(exact_state) == machine.time_steps + 1
     history["overlaps"] = []
     history["avg_overlaps"] = []
 
@@ -101,6 +102,14 @@ def globally(machine: base.BaseMachine,
 
     # Calculate histories
     full_psi = machine.dense
+    # FIXME: Bellow it is a quick fix for growing
+    time_diff = len(exact_state) - len(full_psi)
+    if time_diff > 0:
+      full_psi = np.concatenate(
+          [full_psi, np.array(time_diff * [exact_state[0]])], axis=0)
+    elif time_diff < 0:
+      raise ValueError
+
     if exact_state is not None:
       history["overlaps"].append(calc.overlap(full_psi, exact_state))
       history["avg_overlaps"].append(calc.averaged_overlap(
@@ -124,83 +133,58 @@ def globally(machine: base.BaseMachine,
   return history, machine
 
 
-def sweep(machine: base.BaseMachine, global_optimizer: Callable,
-          n_sweeps: int, binary: bool = False, both_directions: bool = False
-          ) -> Tuple[Dict[str, List[float]], base.BaseMachine]:
-  """Optimizes the Clock Hamiltonian by sweeping in time.
+def grow(machine: base.BaseMachine, time_steps: int, global_optimizer: Callable
+         ) -> Tuple[Dict[str, List[float]], base.BaseMachine]:
+  """Optimizes the Clock Hamiltonian by sweeping and growing in time.
 
-  The first sweep grows in time.
+  This is typically used as a first pass before sweeping or global optimization.
   Note that messages are printed after every time step is optimized and
   currently user cannot change that.
   (there is no `n_message` flag for this method)
 
   Args:
     machine: Machine object to optimize.
+      The given machine should only have one time step (+ initial condition)
+      as the additional time steps will be added from the current method
+      as we optimize.
+    time_steps: Final number of time steps we want the machine to reach.
     global_optimizer: This is a partial function of `optimize.globally`.
       Should have all the arguments except `machine` defined.
       Some of these arguments are altered bellow.
-    n_sweeps: Total number of sweeps to perform.
-    both_directions: If False only 1 --> T sweeps are performed. Otherwise
-      we alternate between this and T --> 1 sweeps.
-      In the latter case we start with T --> 1 sweep because it is assumed that
-      this method is used after `grow` that performs the first 1 -- > T sweep.
 
   Returns:
     history: Dictionary with the history of quantities we track during training.
       See definition of `history` in method for a list of tracked quantities.
     machine: Machine object after its optimization is completed.
   """
-  if n_sweeps <= 0:
-    return dict(), machine
-
-  history = {"sweeping_exact_Eloc": []}
   if "exact_state" in global_optimizer.keywords:
-    n = len(global_optimizer.keywords["exact_state"])
-    assert n == machine.time_steps + 1
-    history["sweeping_overlaps"] = []
-    history["sweeping_avg_overlaps"] = []
+    exact_state = np.copy(global_optimizer.keywords["exact_state"])
+  else:
+    exact_state = None
 
-  if binary:
-    #if not both_directions:
-    #  raise ValueError("It doesn't make sense to do binary sweeps without "
-    #                   "using both directions.")
-    print("Performing binary sweeps.")
-  if both_directions and n_sweeps > 1:
-    print("Sweeping both directions")
+  history = {"growing_exact_Eloc": []}
+  if exact_state is not None:
+    assert len(exact_state) == time_steps + 1
+    history["growing_overlaps"] = []
+    history["growing_avg_overlaps"] = []
 
-  subset_time_steps = [0]
-  for i in range(n_sweeps):
-    print("\nSweep {} / {}".format(i + 1, n_sweeps))
-    if both_directions and i % 2 == 1:
-      time_iter = range(machine.time_steps - 1, 0, -1)
-    else:
-      time_iter = range(machine.time_steps)
+  # Disable global optimization messages during growing in time as we will
+  # print messages from this function
+  if "n_message" in global_optimizer.keywords:
+    global_optimizer.keywords["n_message"] = None
 
-    for time_step in time_iter:
-      if binary:
-        update_zero = both_directions and (i % 2 == 1)
-        step_history, machine = global_optimizer(
-            machine, subset_time_steps=[time_step, time_step + 1],
-            update_time_zero=update_zero)
+  # Grow in time
+  for time_step in range(time_steps):
+    if time_step > 0:
+      machine.add_time_step()
 
-      else:
-        if i > 0:
-          subset_time_steps = None
-        else:
-          subset_time_steps.append(time_step + 1)
+    print("\nOptimizing time step {}...".format(time_step + 1))
+    # Mask global gradient to update only one time step
+    global_optimizer.keywords["index_to_update"] = time_step
+    step_history, machine = global_optimizer(machine)
 
-        step_history, machine = global_optimizer(
-            machine, index_to_update=time_step,
-            subset_time_steps=subset_time_steps)
-
-      if i == 0 and time_step < machine.time_steps - 1:
-        # Initialization of next step when growing in time
-        machine.set_parameters(
-            np.array([machine.tensors[time_step + 1]]), [time_step + 2])
-
-      print("\nTime step: {}".format(time_step + 1))
-      for k, val in step_history.items():
-        history["sweeping_{}".format(k)].append(val)
-        print("{}: {}".format(k, val[-1]))
+    for k, val in step_history.items():
+      history["growing_{}".format(k)].append(val)
+      print("{}: {}".format(k, val[-1]))
 
   return history, machine
