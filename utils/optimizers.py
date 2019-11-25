@@ -8,7 +8,19 @@ class BaseOptimizer:
     pass
 
   def __call__(self, gradient, epoch):
+    self.params = None # dict placeholder
     raise NotImplementedError
+
+  @classmethod
+  def renew(cls, shape, dtype, optimizer):
+    """Creates a new optimizer of the same type with an update shape.
+
+    Useful when growing in time, where the shape of machines changes.
+    """
+    params = optimizer.params
+    params["shape"] = shape
+    params["dtype"] = dtype
+    return cls(**params)
 
 
 class AdamComplex(BaseOptimizer):
@@ -20,6 +32,9 @@ class AdamComplex(BaseOptimizer):
     self.v = np.zeros(shape, dtype=dtype)
     self.beta1, self.beta2 = beta1, beta2
     self.alpha, self.eps = alpha, epsilon
+
+    self.params = {"beta1": beta1, "beta2": beta2,
+                   "alpha": alpha, "epsilon": epsilon}
 
   def __call__(self, gradient, epoch):
     self.m = self.beta1 * self.m + (1 - self.beta1) * gradient
