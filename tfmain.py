@@ -162,14 +162,14 @@ if __name__ == '__main__':
   args.machine_type = "SmallRBM"
 
   # Growing & sweep params
-  args.sweep_epochs = 1000
-  args.n_sweeps = 1
+  #args.sweep_epochs = 1000
+  #args.n_sweeps = 1
   #args.sweep_both_directions = True
   #args.binary_sweeps = True
 
   # Global params
-  #args.n_epochs = 10000
+  args.n_epochs = 10000
 
-  args.save_name = "allstates1_grow_autograd"
+  args.save_name = "allstates1_global_autograd"
 
   main(**vars(args))
