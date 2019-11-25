@@ -12,22 +12,22 @@ cp = sns.color_palette()
 from mpl_toolkits.axes_grid import inset_locator
 
 
-#data_dir = "D:/ClockV5/histories"
-data_dir = "/home/stavros/DATA/MPQ/ClockV4/histories"
+data_dir = "D:/ClockV5/histories"
+#data_dir = "/home/stavros/DATA/MPQ/ClockV4/histories"
 
-save = True
+save = False
 n_sites = 6
 time_steps = 20
 
 
-filename = ["justgrow", "rbm_autograd", "N{}M{}.h5".format(n_sites, time_steps)]
+filename = ["allstates1_grow", "rbm_autograd", "N{}M{}.h5".format(n_sites, time_steps)]
 data = h5py.File(os.path.join(data_dir, "_".join(filename)), "r")
 grow_heff = data["_".join(["growing", "exact_Eloc"])][()].real.ravel()
 grow_overlaps = data["_".join(["growing", "avg_overlaps"])][()].real.ravel()
 data.close()
 
 
-filename = ["allstates", "rbm_autograd", "N{}M{}.h5".format(n_sites, time_steps)]
+filename = ["allstates1_global", "rbm_autograd", "N{}M{}.h5".format(n_sites, time_steps)]
 data = h5py.File(os.path.join(data_dir, "_".join(filename)), "r")
 global_heff = data["exact_Eloc"][()].real
 global_overlaps = data["avg_overlaps"][()].real
