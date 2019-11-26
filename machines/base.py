@@ -120,22 +120,31 @@ class BaseMachine:
       grad: Gradient to use for updating the variational parameters.
       epoch: Epoch number of optimization (needed for Adam optimizer).
     """
-    if grad.shape != self.shape:
-      grad = grad.reshape(self.shape)
-    to_add = self.optimizer(grad, epoch)
     if update_zero:
-      self.tensors[0] += to_add[0]
+      if grad.shape != self.tensors.shape:
+        grad = grad.reshape(self.tensors.shape)
+      to_add = self.optimizer(grad, epoch)
+      self.tensors += to_add
+
     else:
+      if grad.shape != self.shape:
+        grad = grad.reshape(self.shape)
+      to_add = self.optimizer(grad, epoch)
       self.tensors[1:] += to_add
+
     self._dense = None
 
   @classmethod
-  def subset(cls, time_steps: List[int], machine) -> "BaseMachine":
+  def subset(cls, time_steps: List[int], machine, update_zero: bool = False
+             ) -> "BaseMachine":
     """Creates a subset machine by keeping specific time steps"""
     new_tensors = machine.tensors[time_steps]
     old_optimizer = machine.optimizer
     new_machine = cls(machine.name, machine.n_sites, new_tensors)
-    new_machine.optimizer = old_optimizer.renew(new_machine.shape,
-                                                new_machine.dtype,
+    if update_zero:
+      new_shape = new_machine.tensors.shape
+    else:
+      new_shape = new_machine.shape
+    new_machine.optimizer = old_optimizer.renew(new_shape, new_machine.dtype,
                                                 old_optimizer)
     return new_machine

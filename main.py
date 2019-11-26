@@ -54,10 +54,8 @@ parser.add_argument("--n-sweeps", default=0, type=int,
                     help="Number of sweeps.")
 parser.add_argument("--sweep-epochs", default=1000, type=int,
                     help="Number of epochs for each time step during time growing.")
-parser.add_argument("--binary-sweeps", action="store_true",
-                    help="Do binary sweeps instead of normal.")
-parser.add_argument("--sweep-both-directions", action="store_true",
-                    help="Whether to sweep back and forth or only forward.")
+parser.add_argument("--sweep-mode", default=None, type=str,
+                    help="None for full sweeps, otherwise 'binary' or 'triple'.")
 
 # Sampling params
 parser.add_argument("--n-samples", default=0, type=int,
@@ -89,8 +87,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          init_state: Optional[np.ndarray] = None,
          n_sweeps: int = 0,
          sweep_epochs: int = 1000,
-         binary_sweeps: bool = False,
-         sweep_both_directions: bool = False,
+         sweep_mode: Optional[str] = None,
          **machine_params):
   """Main optimization script.
 
@@ -164,8 +161,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
 
     print("Performing sweeps with {} epochs.".format(sweep_epochs))
     sweep_history, machine = optimize.sweep(machine, global_optimizer,
-                                            n_sweeps, binary_sweeps,
-                                            sweep_both_directions)
+                                            n_sweeps, sweep_mode)
 
   # Optimize globally
   if n_epochs > 0:
