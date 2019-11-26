@@ -13,8 +13,9 @@ User can select the directory that `histories` and `final_dense` folders are wit
 
 **Optimization**: Currently the are three optimization methods that all attempt to minimize the Clock energy:
 * Global optimization: This is the default option where all time steps are updated simultaneously in every optimizaton step. Standard gradient descent is used (Adam) with default learning rate. User can specify `--learning-rate` and `--n-epochs`.
-* Sweep optimization: At each optimization step only a single time step is updated while the rest are kept constant. This optimization can be turned on with `--sweep-opt`. Optimization at each time step is done exactly using `scipy.gmres`. It is possible to sweep both directions with `--sweep-both-directions`.
-* Sweep optimization using only one term: Same as normal sweep but only terms with "previous" times are used in optimization (leads to much faster convergence). Can be turned on with `--sweep-opt --sweep-with-one-term`.
+* Sweep optimization: Sweep optimization starts with growing in time and can be enabled by passing a positive integer for `n-sweeps`. Growing in time means adding an additional time step in the ansatz and optimizing only this, until we reach the total number of time steps `T`. `--sweep-epochs` is the number of epochs used for the *local* optimization of each time step. Note that when sweeping only one time step is updated at each step. There are two additional sweep options:
+  *  `--binary-sweeps`: The Hamiltonian used at each *local in time* optimization consists of only two time steps. Otherwise the whole Clock Hamiltonian is used. Even when we use the whole Clock, we update a single time step when sweeping by masking the gradient.
+  * `--sweep-both-directions` continues by sweeping back and forth (1 --> T followed by T --> 1 in DMRG like fashion) . If this is not enabled then only 1 --> T sweeps are performed.
 
 
 **Machines**: Define the ansatz used for the wavefunction at each time. Currently implemented:

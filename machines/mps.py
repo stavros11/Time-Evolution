@@ -2,7 +2,6 @@
 
 import numpy as np
 from machines import base
-from utils import optimizers
 from utils.mps import mps as utils
 from typing import Tuple
 
@@ -10,33 +9,55 @@ from typing import Tuple
 class SmallMPS(base.BaseMachine):
   """MPS machine for small systems - uses dense wavefunctions."""
 
-  def __init__(self, init_state: np.ndarray, time_steps: int, d_bond: int,
-               d_phys: int = 2, learning_rate: float = 1e-3):
-    self.n_states = len(init_state)
-    n_sites = int(np.log2(self.n_states))
+  @classmethod
+  def create(cls, init_state: np.ndarray, time_steps: int, d_bond: int,
+             d_phys: int = 2, learning_rate: float = 1e-3):
+    n_states = len(init_state)
+    n_sites = int(np.log2(n_states))
     name = "mpsD{}".format(d_bond)
-    super(SmallMPS, self).__init__(name, n_sites, time_steps)
-    self.d_bond, self.d_phys = d_bond, d_phys
 
     # Initialize tensors
     tensors = np.array((time_steps + 1) *
                        [utils.dense_to_mps(init_state, d_bond)])
-    self.tensors = tensors.transpose([0, 1, 3, 2, 4])
-    self.dtype = self.tensors.dtype
-    self._dense = self._create_envs()
+    tensors = tensors.transpose([0, 1, 3, 2, 4])
 
-    self.optimizer = optimizers.AdamComplex(self.shape, dtype=self.dtype,
-                                            alpha=learning_rate)
-
-  @property
-  def shape(self) -> Tuple[int]:
-    return self.tensors[1:].shape
+    # Create machine
+    machine =  cls(name, n_sites, tensors, learning_rate)
+    machine.d_bond, machine.d_phys = d_bond, d_phys
+    machine._dense = machine._create_envs()
+    return machine
 
   @property
-  def dense(self) -> np.ndarray:
+  def dense_tensor(self) -> np.ndarray:
     if self._dense is None:
       self._dense = self._create_envs()
-    return self._dense.reshape((self.time_steps + 1, self.n_states))
+    return self._dense
+
+  def gradient(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
+    # Configs should be in {-1, 1} convention
+    configs_t = (configs < 0).astype(configs.dtype).T
+    n_samples = len(configs)
+    srng = np.arange(n_samples)
+
+    grads = np.zeros((n_samples,) + self.shape[1:], dtype=self.dtype)
+
+    right_slicer = (times,) + tuple(configs_t[1:])
+    grads[srng, 0, configs_t[0]] = self.right[-1][right_slicer].swapaxes(-2, -1)
+    for i in range(1, self.n_sites - 1):
+      left_slicer = (times,) + tuple(configs_t[:i])
+      left = self.left[i - 1][left_slicer]
+
+      right_slicer = (times,) + tuple(configs_t[i + 1:])
+      right = self.right[self.n_sites - i - 2][right_slicer]
+
+      grads[srng, i, configs_t[i]] = np.einsum("bmi,bjm->bij", left, right)
+
+    left_slicer = (times,) + tuple(configs_t[:-1])
+    grads[srng, -1, configs_t[-1]] = self.left[-1][left_slicer].swapaxes(-2, -1)
+
+    dense_slicer = (times,) + tuple(configs_t)
+    dense_slicer += (len(self.shape) - 1) * (np.newaxis,)
+    return grads / self.dense_tensor[dense_slicer]
 
   def _vectorized_svd_split(self, m: np.ndarray
                             ) -> Tuple[np.ndarray, np.ndarray]:
@@ -64,12 +85,6 @@ class SmallMPS(base.BaseMachine):
     v = (sm[slicer + (slice(None), slice(None), np.newaxis)] *
          v[slicer + (np.newaxis, slice(None), slice(None))]).sum(axis=-2)
     return u, v
-
-  def _to_canonical_form(self):
-    for i in range(self.n_sites - 1):
-      self.tensors[:, i], v = self._vectorized_svd_split(self.tensors[:, i])
-      self.tensors[:, i + 1] = np.einsum("tlm,tsmr->tslr", v,
-                  self.tensors[:, i + 1])
 
   def _calculate_dense(self) -> np.ndarray:
     """Calculates the dense form of MPS.
@@ -124,107 +139,3 @@ class SmallMPS(base.BaseMachine):
                       self.SYMBOLS[self.n_sites - 1])
     dense = np.einsum(expr, self.left[-1], tensor(-1))
     return np.trace(dense, axis1=-2, axis2=-1)
-
-  def wavefunction(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
-    # Configs should be in {-1, 1} convention
-    configs_sl = tuple((configs < 0).astype(configs.dtype).T)
-    times_before = np.clip(times - 1, 0, self.time_steps)
-    times_after = np.clip(times + 1, 0, self.time_steps)
-
-    psi_before = self._dense[(times_before,) + configs_sl]
-    psi_now = self._dense[(times,) + configs_sl]
-    psi_after = self._dense[(times_after,) + configs_sl]
-
-    return np.stack((psi_before, psi_now, psi_after))
-
-  def gradient(self, configs: np.ndarray, times: np.ndarray) -> np.ndarray:
-    # Configs should be in {-1, 1} convention
-    configs_t = (configs < 0).astype(configs.dtype).T
-    n_samples = len(configs)
-    srng = np.arange(n_samples)
-
-    grads = np.zeros((n_samples,) + self.shape[1:], dtype=self.dtype)
-
-    right_slicer = (times,) + tuple(configs_t[1:])
-    grads[srng, 0, configs_t[0]] = self.right[-1][right_slicer].swapaxes(-2, -1)
-    for i in range(1, self.n_sites - 1):
-      left_slicer = (times,) + tuple(configs_t[:i])
-      left = self.left[i - 1][left_slicer]
-
-      right_slicer = (times,) + tuple(configs_t[i + 1:])
-      right = self.right[self.n_sites - i - 2][right_slicer]
-
-      grads[srng, i, configs_t[i]] = np.einsum("bmi,bjm->bij", left, right)
-
-    left_slicer = (times,) + tuple(configs_t[:-1])
-    grads[srng, -1, configs_t[-1]] = self.left[-1][left_slicer].swapaxes(-2, -1)
-
-    dense_slicer = (times,) + tuple(configs_t)
-    dense_slicer += (len(self.shape) - 1) * (np.newaxis,)
-    return grads / self._dense[dense_slicer]
-
-  def update(self, grad: np.ndarray, epoch: int):
-    if grad.shape != self.shape:
-      grad = grad.reshape(self.shape)
-    to_add = self.optimizer(grad, epoch)
-    self.tensors[1:] += to_add
-    self._dense = None
-
-  def add_time_step(self):
-    self.time_steps += 1
-    new_shape = (self.time_steps + 1,) + self.shape[1:]
-    new_tensors = np.zeros(new_shape, dtype=self.dtype)
-
-    new_tensors[:-1] = np.copy(self.tensors)
-    new_tensors[-1] = np.copy(self.tensors[-1])
-    self.tensors = new_tensors
-    self._dense = None
-
-    learning_rate = self.optimizer.alpha
-    self.optimizer = optimizers.AdamComplex(self.shape, dtype=self.dtype,
-                                            alpha=learning_rate)
-
-
-class SmallMPSNormalized(SmallMPS):
-  """Normalizes the wavefunction by dividing every MPS tensor with the norm.
-
-  Norm calculation is tractable only for small systems.
-  """
-
-  def __init__(self, init_state: np.ndarray, time_steps: int, d_bond: int,
-               d_phys: int = 2):
-    super().__init__(init_state, time_steps, d_bond, d_phys=2)
-    self.name = "mpsD{}norm".format(d_bond)
-    self.axes_to_sum = tuple(range(1, self.n_sites + 1))
-    tensor_slicer = (slice(None),) + len(self.tensors.shape[1:]) * (np.newaxis,)
-    self.dense_slicer = (slice(None),) + self.n_sites * (np.newaxis,)
-
-    norms = np.sqrt((np.abs(self._dense)**2).sum(axis=self.axes_to_sum))
-    self.tensors *= 1.0 / (norms[tensor_slicer])**(1 / self.n_sites)
-
-  def update(self, to_add: np.ndarray) -> np.ndarray:
-    self.tensors[1:] += to_add
-    self._dense = self._create_envs()
-    norms = np.sqrt((np.abs(self._dense)**2).sum(axis=self.axes_to_sum))
-    self._dense *= 1.0 / norms[self.dense_slicer]
-
-
-class SmallMPSCanonical(SmallMPS):
-  """Normalizes the wavefunction by turning MPS to canonical form.
-
-  DOES NOT WORK PROPERLY.
-  """
-
-  def __init__(self, init_state: np.ndarray, time_steps: int, d_bond: int,
-               d_phys: int = 2):
-    super().__init__(init_state, time_steps, d_bond, d_phys=2)
-    self.name = "mpsD{}canonical".format(d_bond)
-    self.canonical_mask = (self.tensors != 0.0).astype(self.dtype)
-    self._to_canonical_form()
-    self._dense = self._create_envs()
-
-  def update(self, to_add: np.ndarray) -> np.ndarray:
-    self.tensors[1:] += to_add
-    self.tensors *= self.canonical_mask
-    self._to_canonical_form()
-    self._dense = self._create_envs()
