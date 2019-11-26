@@ -74,10 +74,7 @@ def globally(machine: base.BaseMachine,
 
     # Calculate gradients
     grad = Ok_star_Eloc - Ok.conj() * Eloc
-    if update_time_zero:
-      assert index_to_update is None
-      grad = grad[0][np.newaxis]
-    else:
+    if not update_time_zero:
       grad = grad[1:]
 
     if index_to_update is not None:
@@ -117,7 +114,7 @@ def globally(machine: base.BaseMachine,
 
 
 def sweep(machine: base.BaseMachine, global_optimizer: Callable,
-          n_sweeps: int, binary: bool = False, both_directions: bool = False
+          n_sweeps: int, binary: bool = False, triple: bool = False
           ) -> Tuple[Dict[str, List[float]], base.BaseMachine]:
   """Optimizes the Clock Hamiltonian by sweeping in time.
 
@@ -152,28 +149,27 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
     history["sweeping_overlaps"] = []
     history["sweeping_avg_overlaps"] = []
 
-  if binary:
-    #if not both_directions:
-    #  raise ValueError("It doesn't make sense to do binary sweeps without "
-    #                   "using both directions.")
-    print("Performing binary sweeps.")
-  if both_directions and n_sweeps > 1:
-    print("Sweeping both directions")
+  if n_sweeps > 1:
+     print("Performing binary sweeps sweeping both directions.")
 
   subset_time_steps = [0]
   for i in range(n_sweeps):
     print("\nSweep {} / {}".format(i + 1, n_sweeps))
-    if both_directions and i % 2 == 1:
+    if binary and i % 2 == 1:
       time_iter = range(machine.time_steps - 1, 0, -1)
     else:
       time_iter = range(machine.time_steps)
 
     for time_step in time_iter:
       if binary:
-        update_zero = both_directions and (i % 2 == 1)
-        step_history, machine = global_optimizer(
+        if i % 2: # sweeping backwards
+          step_history, machine = global_optimizer(
             machine, subset_time_steps=[time_step, time_step + 1],
-            update_time_zero=update_zero)
+            index_to_update=0, update_time_zero=True)
+        else: # sweeping forward
+          step_history, machine = global_optimizer(
+            machine, subset_time_steps=[time_step, time_step + 1],
+            index_to_update=None, update_time_zero=False)
 
       else:
         if i > 0:
