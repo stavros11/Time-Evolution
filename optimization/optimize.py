@@ -60,7 +60,8 @@ def globally(machine: base.BaseMachine,
       raise ValueError("Sampler was given but `detenergy_func` not.")
 
   if subset_time_steps is not None:
-    machine_to_update = machine.subset(subset_time_steps, machine)
+    machine_to_update = machine.subset(subset_time_steps, machine,
+                                       update_time_zero)
   else:
     machine_to_update = machine
 
@@ -114,7 +115,7 @@ def globally(machine: base.BaseMachine,
 
 
 def sweep(machine: base.BaseMachine, global_optimizer: Callable,
-          n_sweeps: int, binary: bool = False, triple: bool = False
+          n_sweeps: int, sweep_mode: Optional[str] = None
           ) -> Tuple[Dict[str, List[float]], base.BaseMachine]:
   """Optimizes the Clock Hamiltonian by sweeping in time.
 
@@ -149,16 +150,27 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
     history["sweeping_overlaps"] = []
     history["sweeping_avg_overlaps"] = []
 
-  if n_sweeps > 1:
-     print("Performing binary sweeps sweeping both directions.")
+  if sweep_mode is None:
+    print("Performing full sweeps sweeping one direction.")
+  elif sweep_mode == "binary":
+    print("Performing binary sweeps sweeping both directions.")
+  elif sweep_mode == "triple":
+    print("Performing triple sweeps sweeping both directions.")
+  else:
+    raise ValueError("Unknown sweep mode {}.".format(sweep_mode))
+  binary = sweep_mode == "binary"
+  triple = sweep_mode == "triple"
 
   subset_time_steps = [0]
   for i in range(n_sweeps):
     print("\nSweep {} / {}".format(i + 1, n_sweeps))
-    if binary and i % 2 == 1:
+
+    # Create correct time step iterator according to the sweeping mode
+    time_iter = range(machine.time_steps)
+    if (binary or triple) and i % 2 == 1:
       time_iter = range(machine.time_steps - 1, 0, -1)
-    else:
-      time_iter = range(machine.time_steps)
+    elif triple and i % 2 == 0 and i > 0:
+      time_iter = range(1, machine.time_steps - 1)
 
     for time_step in time_iter:
       if binary:
@@ -170,6 +182,17 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
           step_history, machine = global_optimizer(
             machine, subset_time_steps=[time_step, time_step + 1],
             index_to_update=None, update_time_zero=False)
+
+      elif triple:
+        if i == 0:
+          step_history, machine = global_optimizer(
+            machine, subset_time_steps=[time_step, time_step + 1],
+            index_to_update=None, update_time_zero=False)
+        else:
+          subset_time_steps = [time_step - 1, time_step, time_step + 1]
+          step_history, machine = global_optimizer(
+            machine, subset_time_steps=subset_time_steps,
+            index_to_update=1, update_time_zero=False)
 
       else:
         if i > 0:

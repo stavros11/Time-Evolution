@@ -135,12 +135,16 @@ class BaseMachine:
     self._dense = None
 
   @classmethod
-  def subset(cls, time_steps: List[int], machine) -> "BaseMachine":
+  def subset(cls, time_steps: List[int], machine, update_zero: bool = False
+             ) -> "BaseMachine":
     """Creates a subset machine by keeping specific time steps"""
     new_tensors = machine.tensors[time_steps]
     old_optimizer = machine.optimizer
     new_machine = cls(machine.name, machine.n_sites, new_tensors)
-    new_machine.optimizer = old_optimizer.renew(new_machine.shape,
-                                                new_machine.dtype,
+    if update_zero:
+      new_shape = new_machine.tensors.shape
+    else:
+      new_shape = new_machine.shape
+    new_machine.optimizer = old_optimizer.renew(new_shape, new_machine.dtype,
                                                 old_optimizer)
     return new_machine
