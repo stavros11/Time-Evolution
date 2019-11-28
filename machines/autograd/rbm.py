@@ -2,7 +2,7 @@ import itertools
 import numpy as np
 import tensorflow as tf
 from machines.autograd import base
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 def initialize_rbm_params(w: Optional[np.ndarray] = None,
@@ -169,6 +169,18 @@ class SmallRBMModel(base.BaseAutoGrad):
     old_params = {k: self._add_time_step_to_variable(x.numpy())
                   for k, x in zip(arg_names, old_params)}
     self._add_variables(**old_params)
+
+  def update(self, grads: List[tf.Tensor], time_step: Optional[int] = None):
+    if time_step is not None:
+      assert isinstance(grads, list)
+      assert time_step >= 0 and time_step < self.time_steps
+
+      for i, grad in enumerate(grads):
+        mask = np.zeros_like(grad.numpy())
+        mask[time_step - 1] = 1
+        grads[i] = mask * grad
+
+    super(SmallRBMModel, self).update(grads)
 
 
 class SmallRBMProductPropModel(SmallRBMModel):

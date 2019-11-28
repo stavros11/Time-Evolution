@@ -107,7 +107,10 @@ class BaseAutoGrad:
     raise NotImplementedError("Gradient method is not supported in AutoGrad "
                               "machines.")
 
-  def update(self, grads: List[tf.Tensor]):
+  def update(self, grads: List[tf.Tensor], time_step: Optional[int] = None):
+    if time_step is not None:
+      raise NotImplementedError("Masked gradient is not implemented for {}."
+                                "".format(self.name))
     self.optimizer.apply_gradients(zip(grads, self.variables))
 
   def add_time_step(self):

@@ -77,7 +77,7 @@ def globally(machine: base.BaseMachine,
     if Ok_star_Eloc is None:
       # this means that we are using automatic gradients and we can directly
       # update the machine using Ok.
-      machine_to_update.update(Ok)
+      machine_to_update.update(Ok, time_step=index_to_update)
 
     else:
       grad = Ok_star_Eloc - Ok.conj() * Eloc
