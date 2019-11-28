@@ -43,14 +43,16 @@ parser.add_argument("--machine-type", default="FullWavefunction",
                     type=str, help="Machine name defined in `autograd.py`.")
 parser.add_argument("--n-epochs", default=0, type=int,
                     help="Number of epochs to train for.")
+parser.add_argument("--n-message", default=500, type=int,
+                    help="Every how many epochs to display messages.")
+
+parser.add_argument("--grow", action="store_true")
 parser.add_argument("--n-sweeps", default=0, type=int,
                     help="Number of sweeps.")
 parser.add_argument("--sweep-epochs", default=1000, type=int,
                     help="Number of epochs for each time step during time growing.")
 parser.add_argument("--learning-rate", default=1e-3, type=float,
                     help="Adam optimizer learning rate.")
-parser.add_argument("--n-message", default=500, type=int,
-                    help="Every how many epochs to display messages.")
 
 # Sampling params
 # TODO: Fix sampling - it is currently not implemented for Keras machines
@@ -73,6 +75,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          n_message: Optional[int] = None,
          h_init: Optional[float] = None,
          init_state: Optional[np.ndarray] = None,
+         grow: Optional[bool] = False,
          n_sweeps: int = 0,
          sweep_epochs: int = 0):
   """Main optimization script.
@@ -103,7 +106,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
   # Set machine
-  machine_time_steps = 1 if n_sweeps > 0 else time_steps
+  machine_time_steps = 1 if grow else time_steps
   machine = getattr(factory, machine_type)(n_sites=n_sites,
                                            time_steps=machine_time_steps,
                                            init_state=exact_state[0],
@@ -114,10 +117,9 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   ham_tf = tf.cast(ham, dtype=machine.output_type)
   ham2_tf = tf.cast(ham2, dtype=machine.output_type)
 
-  opt_params = {"n_epochs": n_epochs, "n_message": n_message}
-  opt_params["exact_state"] = exact_state
-  opt_params["grad_func"] = functools.partial(deterministic_auto.gradient,
-            ham=ham_tf, dt=dt, ham2=ham2_tf)
+  opt_params = {"exact_state": exact_state}
+  opt_params["grad_func"] = functools.partial(
+      deterministic_auto.gradient, ham=ham_tf, dt=dt, ham2=ham2_tf)
 
   print("\n\nInitializing training with {}.".format(machine.name))
   filename = "{}_{}_N{}M{}".format(save_name, machine.name, n_sites, time_steps)
@@ -127,21 +129,42 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   # Set optimization function
   global_optimizer = functools.partial(optimize.globally, **opt_params)
   # Grow in time
-  if n_sweeps > 0:
+  if grow:
     global_optimizer.keywords["n_epochs"] = sweep_epochs
     # Pass a detenergy function in order to calculate Eloc using the full state
     global_optimizer.keywords["detenergy_func"] = functools.partial(
         deterministic.energy, ham=ham, dt=dt, ham2=ham2)
     grow_history, machine = optimize.grow(machine, time_steps, global_optimizer)
 
-    # Reset `global_optimizer` keywords in case we want to continue with
-    # global optimization after growing time
+  if n_sweeps > 0:
+    global_optimizer.keywords["n_epochs"] = sweep_epochs
+    global_optimizer.keywords["n_message"] = None
+    history = {"exact_Eloc": []}
+    if exact_state is not None:
+      history["overlaps"] = []
+      history["avg_overlaps"] = []
+
+    for i in range(n_sweeps):
+      if i % 2:
+        time_iter = range(time_steps - 1, -1, -1)
+      else:
+        time_iter = range(time_steps)
+
+      for time_step in time_iter:
+        sweep_history, machine = global_optimizer(
+            machine, index_to_update=time_step)
+        print("\nTime step: {}".format(time_step))
+        for k, v in sweep_history.items():
+          print("{}: {}".format(k, v[-1]))
+          history[k] += v
+
+  if n_epochs > 0:
+    # Set `global_optimizer` keywords for global optimization
     global_optimizer.keywords["n_epochs"] = n_epochs
     global_optimizer.keywords["n_message"] = n_message
     # Disable gradient mask to update all time steps
     global_optimizer.keywords["index_to_update"] = None
 
-  if n_epochs > 0:
     history, machine = global_optimizer(machine)
 
   history.update(grow_history)
@@ -152,24 +175,4 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
 
 if __name__ == '__main__':
   args = parser.parse_args()
-
-  args.data_dir = "D:/ClockV5/"
-  args.time_steps = 20
-  args.t_final = 1.0
-
-  # Machine params
-  #args.machine_type = "FullWavefunction"
-  args.machine_type = "SmallRBM"
-
-  # Growing & sweep params
-  #args.sweep_epochs = 1000
-  #args.n_sweeps = 1
-  #args.sweep_both_directions = True
-  #args.binary_sweeps = True
-
-  # Global params
-  args.n_epochs = 20000
-
-  args.save_name = "allstates1_global_autograd"
-
   main(**vars(args))
