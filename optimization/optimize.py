@@ -169,8 +169,10 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
     time_iter = range(machine.time_steps)
     if (binary or triple) and i % 2 == 1:
       time_iter = range(machine.time_steps - 1, 0, -1)
-    elif triple and i % 2 == 0 and i > 0:
-      time_iter = range(1, machine.time_steps - 1)
+    elif triple and i % 2 == 0:
+      time_iter = list(range(1, machine.time_steps))
+      time_iter.append(machine.time_steps - 1)
+      index_to_update = 0
 
     for time_step in time_iter:
       if binary:
@@ -184,15 +186,15 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
             index_to_update=None, update_time_zero=False)
 
       elif triple:
-        if i == 0:
-          step_history, machine = global_optimizer(
-            machine, subset_time_steps=[time_step, time_step + 1],
-            index_to_update=None, update_time_zero=False)
-        else:
-          subset_time_steps = [time_step - 1, time_step, time_step + 1]
-          step_history, machine = global_optimizer(
-            machine, subset_time_steps=subset_time_steps,
-            index_to_update=1, update_time_zero=False)
+        step_history, machine = global_optimizer(
+          machine, subset_time_steps=[time_step - 1, time_step, time_step + 1],
+          index_to_update=index_to_update, update_time_zero=False)
+
+        # Handle the boundary case (update both T - 1 and T when going forward)
+        if index_to_update:
+          index_to_update = 0
+        elif i % 2 == 0 and time_step == machine.time_steps - 1:
+          index_to_update = 1
 
       else:
         if i > 0:
@@ -204,7 +206,7 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
             machine, index_to_update=time_step,
             subset_time_steps=subset_time_steps)
 
-      if i == 0 and time_step < machine.time_steps - 1:
+      if i == 0 and time_step < machine.time_steps - 1 and not triple:
         # Initialization of next step when growing in time
         machine.set_parameters(
             np.array([machine.tensors[time_step + 1]]), [time_step + 2])
