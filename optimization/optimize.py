@@ -206,10 +206,18 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
             machine, index_to_update=time_step,
             subset_time_steps=subset_time_steps)
 
-      if i == 0 and time_step < machine.time_steps - 1 and not triple:
-        # Initialization of next step when growing in time
-        machine.set_parameters(
-            np.array([machine.tensors[time_step + 1]]), [time_step + 2])
+      if triple:
+        if i == 0 and time_step < machine.time_steps - 1:
+          # Initialization of next step when growing in time
+          new_values = np.array([machine.tensors[time_step],
+                                 machine.tensors[time_step]])
+          machine.set_parameters(new_values, [time_step + 1, time_step + 2])
+
+      else:
+        if i == 0 and time_step < machine.time_steps - 1:
+          # Initialization of next step when growing in time
+          machine.set_parameters(
+              np.array([machine.tensors[time_step + 1]]), [time_step + 2])
 
       print("\nTime step: {}".format(time_step + 1))
       for k, val in step_history.items():
