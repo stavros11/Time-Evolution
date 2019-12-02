@@ -24,7 +24,7 @@ machine = ["fullwv", "mpsD4"][0]
 save = False
 n_sites = 6
 time_steps = 20
-n_sweeps = 10
+n_sweeps = 1000
 quantity = ["sweeping_exact_Eloc", "sweeping_avg_overlaps"][0]
 
 def sweep_start_x(n_sweeps: int, time_steps: int):
@@ -46,22 +46,28 @@ else:
   sweep_data = data[quantity][()][:, 0]
 data.close()
 
-cut_ind = 1000 * 20
-x_values = np.linspace(0, n_sweeps, len(sweep_data))
 
 fig, ax = plt.subplots(figsize=(7, 4))
 sweep_starts = np.array(list(sweep_start_x(n_sweeps, time_steps)))[1:] - 20
-ax.plot(sweep_data[20:], color=cp[0], linewidth=2.4)
+sweep_starts = sweep_starts[::100]
+ax.semilogy(sweep_data[20:], color=cp[0], linewidth=2.4)
 for x in sweep_starts:
     ax.axvline(x=x, linewidth=2.0, linestyle="--", color="black")
 ax.set_xticks(sweep_starts)
-ax.set_xticklabels(list(range(1, 10)))
+ax.set_xticklabels(list(range(1, n_sweeps, len(sweep_starts))))
 plt.show()
+
+#fig, ax = plt.subplots(figsize=(7, 4))
+#ax.semilogy(sweep_data[15000:15100], color=cp[0], linewidth=2.4)
+#plt.show()
 
 #save_name = ["binary_sweeps_history", quantity, machine,
 #             "N{}M{}.pdf".format(n_sites, time_steps)]
 #plt.savefig("_".join(save_name), bbox_inches="tight")
 
+
+#cut_ind = 1000 * 20
+#x_values = np.linspace(0, n_sweeps, len(sweep_data))
 
 #fig, ax = plt.subplots(figsize=(7, 4))
 #ax.semilogy(x_values, sweep_data, color=cp[0], linewidth=2.4)
