@@ -195,19 +195,19 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
             index_to_update=1, update_time_zero=False)
 
       else:
-        if i > 0:
-          subset_time_steps = None
-        else:
-          subset_time_steps.append(time_step + 1)
+#        if i > 0:
+#          subset_time_steps = None
+#        else:
+#          subset_time_steps.append(time_step + 1)
 
         step_history, machine = global_optimizer(
-            machine, index_to_update=time_step,
-            subset_time_steps=subset_time_steps)
+            machine, index_to_update=time_step)
+            #subset_time_steps=subset_time_steps)
 
-      if i == 0 and time_step < machine.time_steps - 1:
-        # Initialization of next step when growing in time
-        machine.set_parameters(
-            np.array([machine.tensors[time_step + 1]]), [time_step + 2])
+#      if i == 0 and time_step < machine.time_steps - 1:
+#        # Initialization of next step when growing in time
+#        machine.set_parameters(
+#            np.array([machine.tensors[time_step + 1]]), [time_step + 2])
 
       print("\nTime step: {}".format(time_step + 1))
       for k, val in step_history.items():
