@@ -28,7 +28,7 @@ save = True
 n_sites = 6
 time_steps = 20
 n_sweeps = 1000
-quantity = ["sweeping_exact_Eloc", "sweeping_avg_overlaps"][0]
+quantity = ["sweeping_exact_Eloc", "sweeping_avg_overlaps"][1]
 
 def sweep_start_x(n_sweeps: int, time_steps: int):
   counter = 0
@@ -55,14 +55,17 @@ sweep_starts = np.array(list(sweep_start_x(n_sweeps, time_steps)))
 
 
 fig, ax = plt.subplots(figsize=(7, 4))
-ax.semilogy(sweep_data, color=cp[1], linewidth=2.4)
-plt.axhline(y=global_quantities[quantity], color=cp[0], linewidth=2.5)
+ax.semilogy(sweep_data, color=cp[1], linewidth=2.4, label="Sweep")
+ax.axhline(y=global_quantities[quantity], color=cp[0], linewidth=2.5, label="Global")
 if "overlaps" not in quantity:
-  plt.axhline(y=grow_quantities[quantity], color=cp[2], linewidth=2.5)
+  ax.axhline(y=grow_quantities[quantity], color=cp[2], linewidth=2.5, label="Grow")
 ax.set_xticks(sweep_starts[::200])
 ax.set_xticklabels(list(range(0, n_sweeps, n_sweeps // len(sweep_starts[::200]))))
-plt.xlabel("Sweeps")
-plt.ylabel(ylabels[quantity])
+ax.set_xlabel("Sweeps")
+ax.set_ylabel(ylabels[quantity])
+if "overlaps" not in quantity:
+  ax.legend(fontsize=20, loc="upper left")
+
 
 inset_axes = inset_locator.inset_axes(ax, width="50%", height="50%", loc="upper right")
 inset_axes.plot(sweep_data[sweep_starts[600]:], color=cp[1], linewidth=2.4)
