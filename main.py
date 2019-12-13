@@ -142,7 +142,9 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
                                                      ham=ham, dt=dt, ham2=ham2)
     # Initialize sampler
     sampler = [samplers.SpinOnly, samplers.SpinTime][sample_time]
-    opt_params["sampler"] = sampler(n_sites, time_steps, n_samples, n_corr, n_burn)
+    print("Initializing sampler {} with {} samples.".format(sampler, n_samples))
+    opt_params["sampler"] = sampler(n_sites=n_sites, time_steps=time_steps,
+              n_samples=n_samples, n_corr=n_corr, n_burn=n_burn)
   else:
     gradient_func = factory.machine_to_gradient_func[machine_type]
     opt_params["grad_func"] = functools.partial(gradient_func,

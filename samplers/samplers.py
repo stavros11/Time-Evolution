@@ -15,7 +15,7 @@ class Base:
 
     self.n_sites = n_sites
     self.n_states = 2**n_sites
-    self.time_steps = time_steps + 1
+    self.time_steps = time_steps
 
     self.configs = np.zeros([n_samples, n_sites], dtype=np.int32)
     self.times = np.zeros(n_samples, dtype=np.int32)
