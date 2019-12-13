@@ -144,6 +144,9 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
     return dict(), machine
 
   history = {"sweeping_exact_Eloc": []}
+  if ("sampler" in global_optimizer.keywords and
+      global_optimizer.keywords["sampler"] is not None):
+    history["sweeping_sampled_Eloc"] = []
   if "exact_state" in global_optimizer.keywords:
     n = len(global_optimizer.keywords["exact_state"])
     assert n == machine.time_steps + 1

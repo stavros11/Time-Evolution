@@ -111,13 +111,6 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
     raise ValueError("Exactly one of `h_init` and `init_state` should "
                      "be specified.")
 
-  if n_sweeps > 0 and n_samples > 0:
-    raise NotImplementedError("Sweeping optimization is not implemented with "
-                              "sampling.")
-    # Note that in order to implement sweeping with sampling we should
-    # be cautious with the `time_steps` we pass when we create the
-    # sampler here (some refactoring is probably required)
-
   t_grid = np.linspace(0, t_final, time_steps + 1)
   dt = t_grid[1] - t_grid[0]
   ham = tfim.tfim_hamiltonian(n_sites, h=h_ev, pbc=True)
@@ -143,7 +136,13 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
     # Initialize sampler
     sampler = [samplers.SpinOnly, samplers.SpinTime][sample_time]
     print("Initializing sampler {} with {} samples.".format(sampler, n_samples))
-    opt_params["sampler"] = sampler(n_sites=n_sites, time_steps=time_steps,
+    if n_sweeps > 0:
+      if sweep_mode != "triple":
+        raise NotImplementedError
+      opt_params["sampler"] = sampler(n_sites=n_sites, time_steps=2,
+                n_samples=n_samples, n_corr=n_corr, n_burn=n_burn)
+    else:
+      opt_params["sampler"] = sampler(n_sites=n_sites, time_steps=time_steps,
               n_samples=n_samples, n_corr=n_corr, n_burn=n_burn)
   else:
     gradient_func = factory.machine_to_gradient_func[machine_type]
