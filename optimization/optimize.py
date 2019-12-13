@@ -75,7 +75,7 @@ def globally(machine: base.BaseMachine,
 
     # Calculate gradients
     grad = Ok_star_Eloc - Ok.conj() * Eloc
-    if not update_time_zero:
+    if not update_time_zero and sampler is None:
       grad = grad[1:]
 
     if index_to_update is not None:

@@ -29,5 +29,5 @@ class FullWavefunction(base.BaseMachine):
 
     grads = np.zeros((n_samples,) + self.shape[1:], dtype=self.dtype)
     grads[(np.arange(n_samples),) + configs_sl] = (1.0 /
-          self.psi[(times,) + configs_sl])
+          self.tensors[(times,) + configs_sl])
     return grads
