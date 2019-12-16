@@ -56,6 +56,7 @@ def globally(machine: base.BaseMachine,
 
   if sampler is not None:
     history["sampled_Eloc"] = []
+    history["exact_sampled_Eloc"] = []
     if detenergy_func is None:
       raise ValueError("Sampler was given but `detenergy_func` not.")
 
@@ -71,6 +72,7 @@ def globally(machine: base.BaseMachine,
       Ok, Ok_star_Eloc, Eloc, _ = grad_func(machine_to_update)
     else:
       configs, times = sampler(machine_to_update.dense)
+      exact_sampled_Eloc, _ = detenergy_func(machine_to_update.dense)
       Ok, Ok_star_Eloc, Eloc, _, _ = grad_func(machine_to_update, configs, times)
 
     # Calculate gradients
@@ -98,6 +100,7 @@ def globally(machine: base.BaseMachine,
 
     if sampler is not None:
       history["sampled_Eloc"].append(Eloc)
+      history["exact_sampled_Eloc"].append(np.array(exact_sampled_Eloc).sum())
 
     if detenergy_func is None:
       history["exact_Eloc"].append(Eloc)
@@ -147,6 +150,7 @@ def sweep(machine: base.BaseMachine, global_optimizer: Callable,
   if ("sampler" in global_optimizer.keywords and
       global_optimizer.keywords["sampler"] is not None):
     history["sweeping_sampled_Eloc"] = []
+    history["sweeping_exact_sampled_Eloc"] = []
   if "exact_state" in global_optimizer.keywords:
     n = len(global_optimizer.keywords["exact_state"])
     assert n == machine.time_steps + 1
