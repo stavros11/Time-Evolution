@@ -12,8 +12,7 @@ cp = sns.color_palette()
 from mpl_toolkits.axes_grid import inset_locator
 
 
-data_dir = "D:/MPQ/ClockV2/histories/N=6"
-#data_dir = "/home/stavros/DATA/MPQ/ClockV5/histories"
+data_dir = "/home/stavros/DATA/MPQ/ClockV5/histories"
 
 machine = "fullwv"
 save = False
@@ -23,7 +22,7 @@ n_samples = 20000
 
 
 filename = ["sampling{}".format(n_samples), machine,
-            "N{}M{}.h5py".format(n_sites, time_steps)]
+            "N{}M{}.h5".format(n_sites, time_steps)]
 data = h5py.File(os.path.join(data_dir, "_".join(filename)), "r")
 
 exact_Eloc = data["exact_Eloc"][()]
