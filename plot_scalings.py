@@ -19,7 +19,7 @@ filename = ["ed",
             "N{}".format(n_sites),
             "tf{}".format(t_final),
             "h{}_{}".format(h_init, h_ev),
-            "run3"]
+            "run5"]
 filename = "{}.h5".format("_".join(filename))
 file = h5py.File(os.path.join(data_dir, filename), "r")
 
