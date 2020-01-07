@@ -42,8 +42,8 @@ def sweep_start_x(n_sweeps: int, time_steps: int):
       counter += time_steps
 
 def main(data_dir: str, machine: str, n_sites: int, time_steps: int,
-         n_samples: int, n_sweeps: int, quantity: str, save: bool):
-  filename = ["sampling{}".format(n_samples), "triplesweep",
+         n_samples: int, n_sweeps: int, quantity: str, save: bool = False):
+  filename = ["sampling{}".format(n_samples), "triplesweeps{}".format(n_sweeps),
               machine, "N{}M{}.h5".format(n_sites, time_steps)]
   data = h5py.File(os.path.join(data_dir, "_".join(filename)), "r")
   if "overlaps" in quantity:
@@ -65,8 +65,8 @@ def main(data_dir: str, machine: str, n_sites: int, time_steps: int,
     ax.semilogy(sweep_data, color=cp[1], linewidth=2.4, alpha=0.5)
   else:
     ax.semilogy(sweep_data, color=cp[1], linewidth=2.4, label="Sweep")
-  ax.set_xticks(sweep_starts[::10])
-  ax.set_xticklabels(list(range(0, n_sweeps, n_sweeps // len(sweep_starts[::10]))))
+  ax.set_xticks(sweep_starts[::50])
+  ax.set_xticklabels(list(range(0, n_sweeps, n_sweeps // len(sweep_starts[::50]))))
   ax.set_xlabel("Sweeps")
   ax.set_ylabel(ylabels[quantity])
   if "overlaps" not in quantity:
