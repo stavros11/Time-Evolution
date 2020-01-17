@@ -36,7 +36,7 @@ gap = excited_energies - gs_energies
 dt_list_exact = np.linspace(dt_list[-1], dt_list[0], 100)
 plt.figure(figsize=(7, 4))
 plt.semilogy(dt_list, gap, color=cp[0], linewidth=2.0, marker="o",
-             markersize=6, label="Ground state")
+             markersize=6)
 
 scaling = dt_list_exact * gap[-1] / dt_list_exact[0]
 plt.semilogy(dt_list_exact, scaling, color=cp[1],
@@ -58,7 +58,7 @@ plt.legend()
 
 if save:
   script_name = __file__.split("/")[-1].split(".")[0]
-  save_name = [script_name, "N{}.pdf".format(n_sites)]
+  save_name = [script_name, run_name, "N{}.pdf".format(n_sites)]
   plt.savefig("_".join(save_name), bbox_inches="tight")
 else:
   plt.show()
