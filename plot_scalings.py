@@ -29,21 +29,27 @@ dt_list = t_final / file["T_list"][()]
 gs_energies = [file["T{}_eigvals".format(time_steps)][()][0]
                for time_steps in file["T_list"]]
 
-print(scipy.stats.linregress(np.log(dt_list), np.log(gs_energies)))
+linear_fit = scipy.stats.linregress(np.log(dt_list), np.log(gs_energies))
+print(linear_fit)
 
 # Plots
 scalings = [3, 4, 5]
 dt_list_exact = np.linspace(dt_list[-1], dt_list[0], 100)
 plt.figure(figsize=(7, 4))
-plt.loglog(dt_list, gs_energies, color=cp[0], linewidth=2.0, marker="o",
+plt.loglog(dt_list, gs_energies, color=cp[3], linestyle="", marker="o",
            markersize=6, label="Ground state")
+slope, intercept = linear_fit[:2]
 
-for exponent in scalings:
-  scaling = (dt_list_exact**exponent * gs_energies[-1] /
-             dt_list_exact[0]**exponent)
-  plt.semilogy(dt_list_exact, scaling, color=cp[exponent - 1],
-               linewidth=2.0, linestyle="--",
-               label=r"$\sim \delta t^{}$".format(exponent))
+y_exact = np.exp(slope * np.log(dt_list_exact) + intercept)
+plt.loglog(dt_list_exact, y_exact, linewidth=2.0, linestyle="--", color=cp[0],
+           label=r"$\sim \delta t^4$ fit")
+
+#for exponent in scalings:
+#  scaling = (dt_list_exact**exponent * gs_energies[-1] /
+#             dt_list_exact[0]**exponent)
+#  plt.semilogy(dt_list_exact, scaling, color=cp[exponent - 1],
+#               linewidth=2.0, linestyle="--",
+#               label=r"$\sim \delta t^{}$".format(exponent))
 
 plt.xlabel(r"$\delta t$")
 plt.ylabel(r"$\left \langle H_\mathrm{eff}\right \rangle $")
