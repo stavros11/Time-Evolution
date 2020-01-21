@@ -49,6 +49,11 @@ parser.add_argument("--n-epochs", default=0, type=int,
 parser.add_argument("--n-message", default=500, type=int,
                     help="Every how many epochs to display messages.")
 
+# Load previous run parameter
+parser.add_argument("--previous-run", default=None, type=str,
+                    help="Load dense state from previous run final dense.")
+
+
 # Sweeping parms
 parser.add_argument("--n-sweeps", default=0, type=int,
                     help="Number of sweeps.")
@@ -88,6 +93,7 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
          n_sweeps: int = 0,
          sweep_epochs: int = 1000,
          sweep_mode: Optional[str] = None,
+         previous_run: Optional[str] = None,
          **machine_params):
   """Main optimization script.
 
@@ -125,6 +131,16 @@ def main(n_sites: int, time_steps: int, t_final: float, h_ev: float,
   machine_params["time_steps"] = time_steps
   machine = getattr(factory, machine_type).create(**machine_params)
   print("{} machine initialized.".format(machine.name))
+
+  # Load wavefunction from previous optimization
+  if previous_run is not None:
+    if machine_type != "FullWavefunction":
+      raise NotImplementedError("Previous run loading is implemented only for "
+                                "the full wavefunction ansatz.")
+    loaded_state = np.load("{}/final_dense/{}.npy".format(data_dir, previous_run))
+    loaded_state = loaded_state.reshape(machine.tensors.shape)
+    print("Loaded previously optimized state from {}.".format(previous_run))
+    machine.set_parameters(loaded_state)
 
   ham2 = ham.dot(ham)
   opt_params = {"exact_state": exact_state}
