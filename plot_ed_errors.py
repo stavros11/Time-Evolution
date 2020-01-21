@@ -2,7 +2,6 @@ import os
 import h5py
 import numpy as np
 import scipy
-from optimization import deterministic
 from utils import calc, tfim
 
 import matplotlib.pyplot as plt
@@ -32,8 +31,8 @@ T_list.remove(94)
 T_list.remove(98)
 ham = tfim.tfim_hamiltonian(n_sites, h=h_ev)
 
-ed_clock_energy = []
-exact_clock_energy = []
+pauli_X = np.array([[0, 1], [1, 0]])
+sigma_x_error = []
 avg_overlaps = []
 for time_steps in T_list:
   dt = t_final / time_steps
@@ -41,33 +40,16 @@ for time_steps in T_list:
                                              h0=h_init, h=h_ev)
   ed_state = np.copy(file["T{}_ed_state".format(time_steps)][()])
 
-  heff_terms, _ = deterministic.energy(ed_state, ham=ham, dt=dt)
-  ed_clock_energy.append(np.sum(heff_terms))
-  heff_terms, _ = deterministic.energy(exact_state, ham=ham, dt=dt)
-  exact_clock_energy.append(np.sum(heff_terms))
+  exact_sigma_x = calc.ev_local(exact_state, pauli_X).real
+  ed_sigma_x = calc.ev_local(ed_state, pauli_X).real
 
-  avg_overlaps.append(1.0 - calc.averaged_overlap(ed_state, exact_state))
+  sigma_x_error.append(np.mean((exact_sigma_x - ed_sigma_x)**2))
+  avg_overlaps.append(1.0 - calc.averaged_overlap(ed_state, exact_state).real)
 
 
 dt_list = t_final / np.array(T_list)
 plt.figure(figsize=(7, 4))
-plt.semilogy(dt_list, ed_clock_energy, color=cp[0], marker="^", markersize=8,
-             label="Clock")
-plt.semilogy(dt_list, exact_clock_energy, color="black", linestyle="--",
-             marker="v", markersize=8)
-plt.xlabel(r"$\delta t$")
-plt.ylabel(r"$\left \langle H_\mathrm{eff}\right \rangle $")
-plt.legend()
-if save:
-  script_name = __file__.split("/")[-1].split(".")[0]
-  save_name = [script_name, "clock_energy", "N{}.pdf".format(n_sites)]
-  plt.savefig("_".join(save_name), bbox_inches="tight")
-else:
-  plt.show()
-
-
-plt.figure(figsize=(7, 4))
-plt.loglog(dt_list, avg_overlaps, color=cp[3], marker="o", markersize=8,
+plt.semilogy(dt_list, avg_overlaps, color=cp[3], marker="d", markersize=8,
              label="Clock", linestyle="")
 
 linear_fit = scipy.stats.linregress(np.log(dt_list), np.log(avg_overlaps))
@@ -75,7 +57,7 @@ print(linear_fit)
 dt_list_exact = np.linspace(dt_list[-1], dt_list[0], 100)
 slope, intercept = linear_fit[:2]
 y_exact = np.exp(slope * np.log(dt_list_exact) + intercept)
-plt.loglog(dt_list_exact, y_exact, linewidth=2.0, linestyle="--", color=cp[0],
+plt.semilogy(dt_list_exact, y_exact, linewidth=2.0, linestyle="--", color=cp[0],
            label=r"$\sim \delta t^{%.2f}$ fit"%slope)
 
 plt.xlabel(r"$\delta t$")
@@ -84,6 +66,29 @@ plt.legend()
 if save:
   script_name = __file__.split("/")[-1].split(".")[0]
   save_name = [script_name, "avg_overlaps", "N{}.pdf".format(n_sites)]
+  plt.savefig("_".join(save_name), bbox_inches="tight")
+else:
+  plt.show()
+
+
+plt.figure(figsize=(7, 4))
+plt.plot(dt_list, sigma_x_error, color=cp[3], marker="s", markersize=8,
+           label="Clock", linestyle="--")
+
+linear_fit = scipy.stats.linregress(np.log(dt_list), np.log(sigma_x_error))
+print(linear_fit)
+#dt_list_exact = np.linspace(dt_list[-1], dt_list[0], 100)
+#slope, intercept = linear_fit[:2]
+#y_exact = np.exp(slope * np.log(dt_list_exact) + intercept)
+#plt.semilogy(dt_list_exact, y_exact, linewidth=2.0, linestyle="--", color=cp[0],
+#           label=r"$\sim \delta t^{%.2f}$ fit"%slope)
+
+plt.xlabel(r"$\delta t$")
+plt.ylabel(r"$\left \langle \sigma _x \right \rangle$ error")
+#plt.legend()
+if save:
+  script_name = __file__.split("/")[-1].split(".")[0]
+  save_name = [script_name, "sigma_x_error", "N{}.pdf".format(n_sites)]
   plt.savefig("_".join(save_name), bbox_inches="tight")
 else:
   plt.show()
