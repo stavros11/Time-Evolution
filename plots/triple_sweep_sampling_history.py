@@ -28,6 +28,8 @@ parser.add_argument("--n-sites", default=6, type=int)
 parser.add_argument("--time-steps", default=20, type=int)
 parser.add_argument("--n-samples", default=500, type=int)
 parser.add_argument("--n-sweeps", default=100, type=int)
+parser.add_argument("--tick-step", default=100, type=int)
+parser.add_argument("--run-num", default=1, type=int)
 
 parser.add_argument("--quantity", default="sweeping_exact_Eloc", type=str)
 parser.add_argument("--save", action="store_true")
@@ -42,9 +44,12 @@ def sweep_start_x(n_sweeps: int, time_steps: int):
       counter += time_steps
 
 def main(data_dir: str, machine: str, n_sites: int, time_steps: int,
-         n_samples: int, n_sweeps: int, quantity: str, save: bool = False):
-  filename = ["sampling{}".format(n_samples), "triplesweeps{}".format(n_sweeps),
-              machine, "N{}M{}.h5".format(n_sites, time_steps)]
+         n_samples: int, n_sweeps: int, run_num: int, quantity: str,
+         tick_step: int = 100, save: bool = False):
+  filename = ["sampling{}".format(n_samples),
+              "triplesweeps{}".format(n_sweeps),
+              "run{}".format(run_num), machine,
+              "N{}M{}.h5".format(n_sites, time_steps)]
   data = h5py.File(os.path.join(data_dir, "_".join(filename)), "r")
   if "overlaps" in quantity:
     #sweep_data = 1 - data[quantity][()].ravel()
@@ -55,7 +60,8 @@ def main(data_dir: str, machine: str, n_sites: int, time_steps: int,
   sampled_exact_Eloc = data["sweeping_exact_sampled_Eloc"][()][:, 0]
   data.close()
 
-  sweep_starts = list(sweep_start_x(n_sweeps, time_steps))[::100]
+  if tick_step > n_sweeps: tick_step = n_sweeps // 2
+  sweep_starts = list(sweep_start_x(n_sweeps, time_steps))[::tick_step]
   sweep_starts.append(2 * sweep_starts[-1] - sweep_starts[-2])
 
   fig, ax = plt.subplots(figsize=(7, 4))
