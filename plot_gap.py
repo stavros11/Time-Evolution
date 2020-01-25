@@ -32,22 +32,25 @@ excited_energies = np.array([file["T{}_eigvals".format(time_steps)][()][1]
                              for time_steps in file["T_list"]])
 gap = excited_energies - gs_energies
 
+linear_fit = scipy.stats.linregress(np.log(dt_list), np.log(gap))
+print(linear_fit)
+
 # Plots
 dt_list_exact = np.linspace(dt_list[-1], dt_list[0], 100)
 plt.figure(figsize=(7, 4))
-plt.semilogy(dt_list, gap, color=cp[0], linewidth=2.0, marker="o",
-             markersize=6)
+plt.loglog(dt_list, gap, color=cp[3], linestyle="", marker="o",
+             markersize=6, label="Gap")
 
 scaling = dt_list_exact * gap[-1] / dt_list_exact[0]
-plt.semilogy(dt_list_exact, scaling, color=cp[1],
+plt.loglog(dt_list_exact, scaling, color=cp[1],
              linewidth=2.0, linestyle="--",
              label=r"$\sim \delta t$")
 scaling = dt_list_exact**2 * gap[-1] / dt_list_exact[0]**2
-plt.semilogy(dt_list_exact, scaling, color=cp[3],
+plt.loglog(dt_list_exact, scaling, color=cp[0],
              linewidth=2.0, linestyle="--",
              label=r"$\sim \delta t^2$")
 scaling = dt_list_exact**3 * gap[-1] / dt_list_exact[0]**3
-plt.semilogy(dt_list_exact, scaling, color=cp[2],
+plt.loglog(dt_list_exact, scaling, color=cp[2],
              linewidth=2.0, linestyle="--",
              label=r"$\sim \delta t^3$")
 
