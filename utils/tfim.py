@@ -38,60 +38,6 @@ def tfim_hamiltonian(n_sites, h=1.0, pbc=True, dtype=np.complex128):
   return - ham - h * ham_f
 
 
-def tfim_mpo(n_sites, h=1.0, dtype=np.complex128):
-  """Constructs the Hamiltonian of periodic TFIM as a MPO.
-
-  Args:
-    n_sites: Number of sites.
-    h: Transverse field strength.
-    dtype: np type of the arrays.
-
-  Returns:
-    Periodic TFIM Hamiltonian as a MPO of shape (n_sites, 5, 2, 2, 5).
-  """
-  pauli = misc.Pauli(dtype=dtype)
-  assert n_sites > 4
-
-  left_vector = np.zeros([5, 2, 2, 5], dtype=dtype)
-  for i, p in enumerate([pauli.Z, h * pauli.X, pauli.I]):
-    left_vector[0, :, :, i] = np.copy(p)
-
-  right_vector = np.zeros([5, 2, 2, 5], dtype=dtype)
-  for i, p in enumerate([-pauli.I, -h * pauli.X, -pauli.Z]):
-    right_vector[i, :, :, 0] = np.copy(p)
-
-
-  left_matrix = np.zeros([5, 2, 2, 5], dtype=dtype)
-  left_matrix[0, :, :, 0] = pauli.Z
-  left_matrix[0, :, :, 1] = pauli.I
-  left_matrix[1, :, :, 0] = pauli.I
-  left_matrix[2, :, :, 2] = pauli.Z
-  left_matrix[2, :, :, 3] = h * pauli.X
-  left_matrix[2, :, :, 4] = pauli.I
-
-  right_matrix = np.zeros([5, 2, 2, 5], dtype=dtype)
-  right_matrix[0, :, :, 0] = pauli.I
-  right_matrix[1, :, :, 2] = pauli.I
-  right_matrix[2, :, :, 0] = pauli.Z
-  right_matrix[3, :, :, 0] = pauli.I
-  right_matrix[4, :, :, 0] = h * pauli.X
-  right_matrix[4, :, :, 1] = pauli.I
-  right_matrix[4, :, :, 2] = pauli.Z
-
-  middle_matrix = np.zeros([5, 2, 2, 5], dtype=dtype)
-  middle_matrix[0, :, :, 0] = pauli.I
-  middle_matrix[1, :, :, 1] = pauli.I
-  middle_matrix[2, :, :, 0] = pauli.Z
-  middle_matrix[3, :, :, 0] = pauli.I
-  middle_matrix[4, :, :, 2] = pauli.Z
-  middle_matrix[4, :, :, 3] = h * pauli.X
-  middle_matrix[4, :, :, 4] = pauli.I
-
-  return np.stack([left_vector, left_matrix] +
-                  (n_sites - 4) * [middle_matrix] +
-                  [right_matrix, right_vector])
-
-
 def tfim_exact_evolution(n_sites, t_final, time_steps, h0=None, h=0.5,
                          init_state=None, dtype=np.complex128):
   """Exact unitary evolution of TFIM using full propagator matrix.
@@ -138,23 +84,3 @@ def tfim_exact_evolution(n_sites, t_final, time_steps, h0=None, h=0.5,
 
   observables = {"energy": energy, "X": sigma_x}
   return np.array(state), observables
-
-
-def tfim_trotterized_evolution(u_list, psi0, time_steps):
-  """Trotterized evolution of full wavefunction.
-
-  Args:
-    u_list: List of unitary operators for one step time propagation.
-    psi0: Initial condition with shape (2**N,).
-    time_steps: Number of times to apply the evolution unitary.
-
-  Returns:
-    state: Evolved state.
-  """
-  state = [np.copy(psi0)]
-  for i in range(time_steps):
-    state_temp = np.copy(state[-1])
-    for u in u_list:
-      state_temp = u.dot(state_temp)
-    state.append(np.copy(state_temp))
-  return np.array(state)
