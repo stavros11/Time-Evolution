@@ -50,31 +50,6 @@ class CartesianMachine:
     return loss
 
 
-class ComplexFullWavefunction:
-  """DOES NOT WORK"""
-
-  def __init__(self, initial_state: np.ndarray, dtype=tf.complex128):
-    self.ctype = dtype
-    self.psi = tf.Variable(initial_state, dtype=dtype)
-    self.optimizer = tf.keras.optimizers.Adam(1e-3)
-    self.variables = [self.psi]
-
-    mask = np.ones_like(initial_state)
-    mask[0] = 0.0
-    self.mask = tf.convert_to_tensor(mask, dtype=dtype)
-
-  @property
-  def dense(self):
-    return self.psi
-
-  def update(self, objective) -> tf.Tensor:
-    with tf.GradientTape() as tape:
-      loss = objective(self.psi)
-    grads = tape.gradient(loss, self.variables) * self.mask
-    self.optimizer.apply_gradients(zip(grads, self.variables))
-    return loss
-
-
 class FullWavefunction:
 
   def __init__(self, initial_state: np.ndarray, dtype=tf.float64):
