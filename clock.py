@@ -20,27 +20,25 @@ def energy(psi_all: tf.Tensor, Ham: tf.Tensor, dt: float,
     Heff_samples: Array of shape (M+1, 2**N) with the Hamiltonian terms
       before the reduce sum.
   """
-  M = len(psi_all) - 1
-
   if Ham2 is None:
     Ham2 = tf.matmul(Ham, Ham)
 
   # H^0 term
   n_Heff_0 = psi_all[0] - psi_all[1]
-  n_Heff_M = psi_all[M] - psi_all[M-1]
-  n_Heff = 2 * psi_all[1:M] - psi_all[:M-1] - psi_all[2:]
+  n_Heff_M = psi_all[-1] - psi_all[-2]
+  n_Heff = 2 * psi_all[1:-1] - psi_all[:-2] - psi_all[2:]
 
   # H^1 term
   n_Heff_0 -= 1j * dt * tf.matmul(Ham, psi_all[1][:, tf.newaxis])[:, 0]
-  n_Heff_M += 1j * dt * tf.matmul(Ham, psi_all[M-1][:, tf.newaxis])[:, 0]
-  n_Heff += 1j * dt * tf.matmul(psi_all[:M - 1] - psi_all[2:], Ham,
+  n_Heff_M += 1j * dt * tf.matmul(Ham, psi_all[-2][:, tf.newaxis])[:, 0]
+  n_Heff += 1j * dt * tf.matmul(psi_all[:-2] - psi_all[2:], Ham,
                                 transpose_b=True)
 
   # H^2 term
   n_Heff2_all = tf.matmul(psi_all, Ham2, transpose_b=True)
   n_Heff_0 += 0.5 * dt * dt * n_Heff2_all[0]
-  n_Heff_M += 0.5 * dt * dt * n_Heff2_all[M]
-  n_Heff += dt * dt * n_Heff2_all[1:M]
+  n_Heff_M += 0.5 * dt * dt * n_Heff2_all[-1]
+  n_Heff += dt * dt * n_Heff2_all[1:-1]
 
   # Calculate sums
   phi_phi = tf.reduce_sum(tf.square(tf.abs(psi_all)))
