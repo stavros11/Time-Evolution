@@ -24,9 +24,7 @@ exact_state, exact_obs = tfim.tfim_exact_evolution(n_sites, t_final, time_steps,
 
 # Define ansatz
 initial_state = np.array((time_steps + 1) * [exact_state[0]])
-model_re = machine.FullWavefunction(initial_state.real)
-model_im = machine.FullWavefunction(initial_state.imag)
-model = machine.CartesianMachine(model_re, model_im)
+model = machine.FullWavefunction(initial_state)
 
 ham_tf = tf.convert_to_tensor(ham, dtype=model.ctype)
 ham2_tf = tf.matmul(ham, ham)
