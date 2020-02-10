@@ -10,7 +10,7 @@ time_steps = 20
 t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
-n_epochs = 10000
+n_epochs = 20000
 n_message = 500
 
 dt = t_final / time_steps
@@ -24,7 +24,7 @@ exact_state, exact_obs = tfim.tfim_exact_evolution(n_sites, t_final, time_steps,
 
 # Define ansatz
 initial_state = np.array((time_steps + 1) * [exact_state[0]])
-model = machine.FullWavefunction(initial_state)
+model = machine.FullProp(initial_state)
 
 ham_tf = tf.convert_to_tensor(ham, dtype=model.ctype)
 ham2_tf = tf.matmul(ham, ham)
