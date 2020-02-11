@@ -2,7 +2,7 @@ import functools
 import numpy as np
 import tensorflow as tf
 import clock
-import machine
+import machines
 from utils import calc, tfim
 
 n_sites = 6
@@ -24,10 +24,13 @@ exact_state, exact_obs = tfim.tfim_exact_evolution(n_sites, t_final, time_steps,
 
 # Define ansatz
 initial_state = np.array((time_steps + 1) * [exact_state[0]])
-model = machine.FullProp(initial_state)
+model = machines.CopiedFFNN(initial_state, n_hidden=6)
 
 ham_tf = tf.convert_to_tensor(ham, dtype=model.ctype)
-ham2_tf = tf.matmul(ham, ham)
+ham2_tf = tf.cast(tf.matmul(ham, ham), dtype=model.ctype)
+print(model.ctype)
+print(ham_tf.dtype)
+print(ham2_tf.dtype)
 objective_func = functools.partial(clock.energy, Ham=ham_tf, dt=dt, Ham2=ham2_tf)
 
 
