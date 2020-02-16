@@ -11,8 +11,9 @@ t_final = 1.0
 h_init = 1.0
 h_ev = 0.5
 n_epochs = 1000
-machine_type = "CopiedFFNN"
-machine_params = {"time_steps": 1, "dtype": tf.float32, "n_hidden": 6}
+#machine_type = "CopiedFFNN"
+machine_type = "FullWavefunction"
+machine_params = {"time_steps": 1, "dtype": tf.float32}#, "n_hidden": 6}
 
 
 dt = t_final / time_steps

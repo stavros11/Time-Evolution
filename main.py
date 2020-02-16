@@ -12,6 +12,10 @@ h_init = 1.0
 h_ev = 0.5
 n_epochs = 20000
 n_message = 500
+#machine_type = "CopiedFFNN"
+machine_type = "FullWavefunction"
+machine_params = {"time_steps": time_steps, "dtype": tf.float32}#, "n_hidden": 6}
+
 
 dt = t_final / time_steps
 t = np.linspace(0, t_final, time_steps + 1)
@@ -23,13 +27,11 @@ exact_state, exact_obs = tfim.tfim_exact_evolution(n_sites, t_final, time_steps,
                                                    h0=h_init, h=h_ev)
 
 # Define ansatz
-model = machines.FullWavefunction(exact_state, time_steps, tf.float32)
+machine_params["initial_condition"] = exact_state[0]
+model = getattr(machines, machine_type)(**machine_params)
 
 ham_tf = tf.convert_to_tensor(ham, dtype=model.ctype)
 ham2_tf = tf.cast(tf.matmul(ham, ham), dtype=model.ctype)
-print(model.ctype)
-print(ham_tf.dtype)
-print(ham2_tf.dtype)
 objective_func = functools.partial(clock.energy, Ham=ham_tf, dt=dt, Ham2=ham2_tf)
 
 
