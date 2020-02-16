@@ -47,29 +47,22 @@ class CopiedFFNN(base.Base):
     return tf.concat([self.psi0, tf.transpose(psi)], axis=0)
 
   @staticmethod
-  def get_weight_dict(model: tf.keras.Model) -> Dict[str, tf.Tensor]:
-    d = {}
-    d["dense_w"], d["dense_b"] = model.layers[0].variables
-    d["lconn_w"], d["lconn_b"] = model.layers[2].variables
-    return d
+  def transfer_model(old_model: tf.keras.Model, new_model: tf.keras.Model,
+                     n_hidden: int) -> tf.keras.Model:
+    def get_weight_dict(model: tf.keras.Model) -> Dict[str, tf.Tensor]:
+      d = {}
+      d["dense_w"], d["dense_b"] = model.layers[0].variables
+      d["lconn_w"], d["lconn_b"] = model.layers[2].variables
+      return d
 
-  @classmethod
-  def add_time_step(cls, old_machine: "CopiedFFNN") -> "CopiedFFNN":
-    params = dict(old_machine.init_params)
-    params["time_steps"] += 1
-    new_machine = cls(**params)
-
-    # Assign weights of the new keras model from the old one
-    # FIXME: Do the below weight assignment for `model_re` and `model_im`
-    # self.model doesn't exist!
-    old_weights = cls.get_weight_dict(old_machine.model)
-    new_weights = cls.get_weight_dict(new_machine.model)
+    old_weights = get_weight_dict(old_model)
+    new_weights = get_weight_dict(new_model)
 
     new_dense_w = tf.concat([old_weights["dense_w"],
-                             old_weights["dense_w"][:, -self.n_hidden:]],
+                             old_weights["dense_w"][:, -n_hidden:]],
                             axis=1)
     new_dense_b = tf.concat([old_weights["dense_b"],
-                             old_weights["dense_b"][-self.n_hidden:]], axis=0)
+                             old_weights["dense_b"][-n_hidden:]], axis=0)
     new_weights["dense_w"].assign(new_dense_w)
     new_weights["dense_b"].assign(new_dense_b)
 
@@ -79,5 +72,19 @@ class CopiedFFNN(base.Base):
                              old_weights["lconn_b"][-1][tf.newaxis]], axis=0)
     new_weights["lconn_w"].assign(new_lconn_w)
     new_weights["lconn_b"].assign(new_lconn_b)
+
+    return new_model
+
+  @classmethod
+  def add_time_step(cls, old_machine: "CopiedFFNN") -> "CopiedFFNN":
+    params = dict(old_machine.init_params)
+    params["time_steps"] += 1
+    new_machine = cls(**params)
+
+    # Assign weights of the new keras model from the old one
+    new_machine.model_re = cls.transfer_model(
+        old_machine.model_re, new_machine.model_re, old_machine.n_hidden)
+    new_machine.model_im = cls.transfer_model(
+        old_machine.model_im, new_machine.model_im, old_machine.n_hidden)
 
     return new_machine
